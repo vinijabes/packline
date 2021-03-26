@@ -1,0 +1,19 @@
+[package]
+name = "packline_flow"
+version = "0.1.0"
+authors = ["Vinícius Jabes <vinijabes@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "packline_flow"
+
+[dependencies]
+flow_derive = { path = "libs/flow_derive" }
+packline_core = {path="../packline_core", features=["protocol"]}
+async-trait = {version = "0.1.48"}
+
+tokio = { version = "1.4.0", features = ["process"] }
+tokio-sync = "0.1.8"
+futures = "0.3.13"

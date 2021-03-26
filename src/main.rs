@@ -1,37 +1,34 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use tokio::net::{TcpListener, TcpStream};
+use futures::{FutureExt, StreamExt};
+use packline_core::app::App;
+use packline_core::connector::{Connector, TCPConnector};
+use packline_flow::FlowConnector;
+use tokio::net::{TcpStream};
 use tokio_util::codec::{BytesCodec, Framed};
+use std::borrow::Borrow;
 
-use futures::StreamExt;
-
-use flow::FlowSchema;
-
-#[derive(FlowSchema)]
-pub struct SchemaTest {
-    x: u32,
-    y: u32,
-    z: u32,
-    w: u32,
-}
+mod core;
 
 #[tokio::main]
 async fn main() {
-    let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 1883); // localhost:1883
-    let listener = TcpListener::bind(address).await.unwrap();
+    let _ = tokio::spawn(async {
+        let app = &mut packline_core::app::App {};
 
-    loop {
-        let (stream, addr) = listener.accept().await.unwrap();
-        println!("New connection: {}", addr);
-        tokio::spawn(async move {
-            handle_client(stream).await;
-        });
-    }
+        //TODO: detect program shutdown step and send oneshot signal.
+        let (_tx, rx) = tokio::sync::oneshot::channel();
+
+        let mut connector = TCPConnector::new(Box::new(FlowConnector { app: &App {} }));
+        connector
+            .run(app, tokio::runtime::Handle::current(), &mut rx.fuse())
+            .await;
+
+        println!("After run!")
+    }).await;
 }
 
-async fn handle_client(stream: TcpStream) {
-    let mut framed = Framed::new(stream, BytesCodec::new());
-    println!("New client thread spawned");
-
-    let packet = framed.next().await;
-    println!("{:#?}", packet);
-}
+// async fn handle_client(stream: TcpStream) {
+//     let mut framed = Framed::new(stream, BytesCodec::new());
+//     println!("New client thread spawned");
+//
+//     let packet = framed.next().await;
+//     println!("{:#?}", packet);
+// }

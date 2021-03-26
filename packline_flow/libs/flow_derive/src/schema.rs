@@ -2,25 +2,63 @@ use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::{self, parse_quote, spanned::Spanned, Data, Fields, GenericParam, Generics};
 
-pub fn expand_derive_schema(input: syn::DeriveInput) -> Result<TokenStream, Vec<syn::Error>> {
+pub fn expand_derive_deserializable_schema(
+    input: syn::DeriveInput,
+) -> Result<TokenStream, Vec<syn::Error>> {
     let name = &input.ident;
 
     let generics = add_trait_bounds(input.generics);
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     let expand_deserialize = deserialize(name, &input.data);
+
+    let expanded = quote! {
+        // ...
+        impl #impl_generics flow::DeserializableSchema for #name #ty_generics #where_clause{
+            fn deserialize() -> Result<Self::Item, Self::Error> {
+                #expand_deserialize
+            }
+
+            type Item = #name #ty_generics;
+            type Error = std::convert::Infallible;
+        }
+    };
+
+    Ok(TokenStream::from(expanded))
+}
+
+pub fn expand_derive_serializable_schema(
+    input: syn::DeriveInput,
+) -> Result<TokenStream, Vec<syn::Error>> {
+    let name = &input.ident;
+
+    let generics = add_trait_bounds(input.generics);
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+    let expanded = quote! {
+        // ...
+        impl #impl_generics flow::SerializableSchema for #name #ty_generics #where_clause{
+            fn serialize(&self) {
+            }
+
+            type Error = std::convert::Infallible;
+        }
+    };
+
+    Ok(TokenStream::from(expanded))
+}
+
+pub fn expand_derive_sized_schema(input: syn::DeriveInput) -> Result<TokenStream, Vec<syn::Error>> {
+    let name = &input.ident;
+
+    let generics = add_trait_bounds(input.generics);
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
     let expand_size = size_of(&input.data);
 
     let expanded = quote! {
         // ...
-        impl #impl_generics flow::Schema for #name #ty_generics #where_clause{
-            fn deserialize() -> Self {
-                #expand_deserialize
-            }
-
-            fn serialize() {
-            }
-
+        impl #impl_generics flow::SizedSchema for #name #ty_generics #where_clause{
             fn size(&self) -> usize{
                 #expand_size
             }
@@ -48,7 +86,7 @@ fn deserialize(struct_name: &proc_macro2::Ident, data: &Data) -> TokenStream {
                     let ty = &f.ty;
 
                     quote_spanned! {f.span()=>
-                        let #name = #ty::deserialize();
+                        let #name = #ty::deserialize().unwrap();
                     }
                 });
 
@@ -64,9 +102,11 @@ fn deserialize(struct_name: &proc_macro2::Ident, data: &Data) -> TokenStream {
                         #recurse_deserialize
                     )*
 
-                    #struct_name {
-                        #(#recurse_fields),*
-                    }
+                    Ok(
+                        #struct_name {
+                            #(#recurse_fields),*
+                        }
+                    )
                 }
             }
             Fields::Unnamed(_) => unimplemented!(),
@@ -82,7 +122,7 @@ fn size_of(data: &Data) -> TokenStream {
             Fields::Named(ref fields) => {
                 let recurse = fields.named.iter().map(|f| {
                     let name = &f.ident;
-                    quote_spanned! (f.span()=>flow::Schema::size(&self.#name))
+                    quote_spanned! (f.span()=>flow::SizedSchema::size(&self.#name))
                 });
 
                 quote! {

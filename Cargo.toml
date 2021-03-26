@@ -4,14 +4,15 @@ version = "0.1.0"
 authors = ["Vinícius Jabes <vinijabes@gmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-flow = { path = "libs/flow" }
+packline_flow = { path = "packline_flow" }
+packline_core = { path = "packline_core", features = ["all"]}
 
-tokio = { version = "1", features = ["full"] }
-tokio-util = {version = "0.6.4", features = ["codec"]}
+tokio = { version = "1.4.0", features = ["full"] }
+tokio-util = {version = "0.6.5", features = ["codec"]}
 
 bytes = "1.0.0"
 futures = "0.3.13"
 linked-hash-map = "0.5.3"
+
+ctrlc = { version = "3.0", features = ["termination"] }
