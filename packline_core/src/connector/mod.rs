@@ -9,6 +9,6 @@ use crate::app::App;
 pub mod tcp;
 
 #[async_trait]
-pub trait Connector: Send{
+pub trait Connector: Send {
     async fn run(&mut self, app: &mut App, handle: Handle, mut signal: &mut Fuse<Receiver<bool>>);
 }

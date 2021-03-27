@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use async_trait::async_trait;
 pub use flow_derive::*;
 use futures::stream::StreamExt;
-use packline_core::{app::App};
+use packline_core::app::App;
 use packline_core::connector::{TCPConnectionHandler, TCPConnectorHandler};
 pub use schema::{DeserializableSchema, Schema, SerializableSchema, SizedSchema};
 use tokio::net::TcpStream;

@@ -1,0 +1,4 @@
+max_width = 120
+comment_width = 100
+error_on_line_overflow = true
+error_on_unformatted = true

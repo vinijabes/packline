@@ -2,9 +2,7 @@ use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::{self, parse_quote, spanned::Spanned, Data, Fields, GenericParam, Generics};
 
-pub fn expand_derive_deserializable_schema(
-    input: syn::DeriveInput,
-) -> Result<TokenStream, Vec<syn::Error>> {
+pub fn expand_derive_deserializable_schema(input: syn::DeriveInput) -> Result<TokenStream, Vec<syn::Error>> {
     let name = &input.ident;
 
     let generics = add_trait_bounds(input.generics);
@@ -27,9 +25,7 @@ pub fn expand_derive_deserializable_schema(
     Ok(TokenStream::from(expanded))
 }
 
-pub fn expand_derive_serializable_schema(
-    input: syn::DeriveInput,
-) -> Result<TokenStream, Vec<syn::Error>> {
+pub fn expand_derive_serializable_schema(input: syn::DeriveInput) -> Result<TokenStream, Vec<syn::Error>> {
     let name = &input.ident;
 
     let generics = add_trait_bounds(input.generics);

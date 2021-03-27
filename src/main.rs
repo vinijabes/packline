@@ -19,5 +19,6 @@ async fn main() {
             .await;
 
         println!("After run!")
-    }).await;
+    })
+    .await;
 }

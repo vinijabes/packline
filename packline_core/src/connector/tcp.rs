@@ -2,7 +2,7 @@ use std::io::Error;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use async_trait::async_trait;
-use futures::{future::Fuse, FutureExt, select};
+use futures::{future::Fuse, select, FutureExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime::Handle;
 use tokio::sync::oneshot::Receiver;
@@ -20,14 +20,12 @@ pub trait TCPConnectionHandler: Send {
 }
 
 pub struct TCPConnector {
-    handler: Box<dyn TCPConnectorHandler>
+    handler: Box<dyn TCPConnectorHandler>,
 }
 
 impl TCPConnector {
     pub fn new(handler: Box<dyn TCPConnectorHandler>) -> TCPConnector {
-        TCPConnector {
-            handler: handler
-        }
+        TCPConnector { handler: handler }
     }
 }
 
@@ -50,7 +48,6 @@ impl Connector for TCPConnector {
             };
 
             if res.is_ok() {
-
                 let mut conn_handler = self.handler.handle_connection(res.unwrap());
 
                 handle.spawn(async move {

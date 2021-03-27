@@ -10,7 +10,7 @@ pub struct ConnectRequestV1 {
     pub x: i64,
 }
 
-impl Display for ConnectRequestV1{
+impl Display for ConnectRequestV1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.x)
     }

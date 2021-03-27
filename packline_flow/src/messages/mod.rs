@@ -26,4 +26,4 @@ pub struct Packet<'a> {
     pub message: &'a dyn Message<'a>,
 }
 
-unsafe impl<'a> Send for Packet<'a>{}
+unsafe impl<'a> Send for Packet<'a> {}
