@@ -312,6 +312,7 @@ dependencies = [
  "packline_core",
  "tokio",
  "tokio-sync",
+ "tokio-util",
 ]
 
 [[package]]

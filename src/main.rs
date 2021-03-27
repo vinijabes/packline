@@ -1,10 +1,7 @@
-use futures::{FutureExt, StreamExt};
+use futures::FutureExt;
 use packline_core::app::App;
 use packline_core::connector::{Connector, TCPConnector};
 use packline_flow::FlowConnector;
-
-
-
 
 mod core;
 
@@ -24,11 +21,3 @@ async fn main() {
         println!("After run!")
     }).await;
 }
-
-// async fn handle_client(stream: TcpStream) {
-//     let mut framed = Framed::new(stream, BytesCodec::new());
-//     println!("New client thread spawned");
-//
-//     let packet = framed.next().await;
-//     println!("{:#?}", packet);
-// }
