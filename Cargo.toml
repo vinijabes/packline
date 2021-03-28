@@ -9,10 +9,6 @@ packline_flow = { path = "packline_flow" }
 packline_core = { path = "packline_core", features = ["full"]}
 
 tokio = { version = "1.4.0", features = ["full"] }
-tokio-util = {version = "0.6.5", features = ["codec"]}
-
-bytes = "1.0.0"
 futures = "0.3.13"
-linked-hash-map = "0.5.3"
 
 ctrlc = { version = "3.0", features = ["termination"] }

@@ -11,9 +11,8 @@ pub fn expand_derive_deserializable_schema(input: syn::DeriveInput) -> Result<To
     let expand_deserialize = deserialize(name, &input.data);
 
     let expanded = quote! {
-        // ...
         impl #impl_generics flow::DeserializableSchema for #name #ty_generics #where_clause{
-            fn deserialize() -> Result<Self::Item, Self::Error> {
+            fn deserialize(_decoder: &mut flow::codec::decoder::ByteDecoder) -> Result<Self::Item, Self::Error> {
                 #expand_deserialize
             }
 

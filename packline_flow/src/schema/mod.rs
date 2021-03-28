@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+
 pub enum Types {
     Boolean,
     Int8,
@@ -26,7 +28,7 @@ pub trait SerializableSchema: SizedSchema {
 }
 
 pub trait DeserializableSchema: SizedSchema {
-    fn deserialize() -> Result<Self::Item, Self::Error>
+    fn deserialize(decoder: &mut crate::codec::decoder::ByteDecoder) -> Result<Self::Item, Self::Error>
     where
         Self: Sized;
 
@@ -44,8 +46,10 @@ impl SerializableSchema for i8 {
 
 impl DeserializableSchema for i8 {
     #[inline(always)]
-    fn deserialize() -> Result<i8, std::convert::Infallible> {
-        Ok(10i8)
+    fn deserialize(decoder: &mut crate::codec::decoder::ByteDecoder) -> Result<i8, std::convert::Infallible> {
+        Ok(i8::from_be_bytes(
+            decoder.next(1).try_into().expect("slice with incorrect length"),
+        ))
     }
 
     type Item = i8;
@@ -66,8 +70,10 @@ impl SerializableSchema for i16 {
 
 impl DeserializableSchema for i16 {
     #[inline(always)]
-    fn deserialize() -> Result<i16, std::convert::Infallible> {
-        Ok(10i16)
+    fn deserialize(decoder: &mut crate::codec::decoder::ByteDecoder) -> Result<i16, std::convert::Infallible> {
+        Ok(i16::from_be_bytes(
+            decoder.next(2).try_into().expect("slice with incorrect length"),
+        ))
     }
 
     type Item = i16;
@@ -88,8 +94,10 @@ impl SerializableSchema for i32 {
 
 impl DeserializableSchema for i32 {
     #[inline(always)]
-    fn deserialize() -> Result<i32, std::convert::Infallible> {
-        Ok(10i32)
+    fn deserialize(decoder: &mut crate::codec::decoder::ByteDecoder) -> Result<i32, std::convert::Infallible> {
+        Ok(i32::from_be_bytes(
+            decoder.next(4).try_into().expect("slice with incorrect length"),
+        ))
     }
 
     type Item = i32;
@@ -110,8 +118,10 @@ impl SerializableSchema for i64 {
 
 impl DeserializableSchema for i64 {
     #[inline(always)]
-    fn deserialize() -> Result<i64, std::convert::Infallible> {
-        Ok(10i64)
+    fn deserialize(decoder: &mut crate::codec::decoder::ByteDecoder) -> Result<i64, std::convert::Infallible> {
+        Ok(i64::from_be_bytes(
+            decoder.next(8).try_into().expect("slice with incorrect length"),
+        ))
     }
 
     type Item = i64;
@@ -132,8 +142,10 @@ impl SerializableSchema for u16 {
 
 impl DeserializableSchema for u16 {
     #[inline(always)]
-    fn deserialize() -> Result<u16, std::convert::Infallible> {
-        Ok(10u16)
+    fn deserialize(decoder: &mut crate::codec::decoder::ByteDecoder) -> Result<u16, std::convert::Infallible> {
+        Ok(u16::from_be_bytes(
+            decoder.next(2).try_into().expect("slice with incorrect length"),
+        ))
     }
 
     type Item = u16;
@@ -154,8 +166,10 @@ impl SerializableSchema for u32 {
 
 impl DeserializableSchema for u32 {
     #[inline(always)]
-    fn deserialize() -> Result<u32, std::convert::Infallible> {
-        Ok(10u32)
+    fn deserialize(decoder: &mut crate::codec::decoder::ByteDecoder) -> Result<u32, std::convert::Infallible> {
+        Ok(u32::from_be_bytes(
+            decoder.next(4).try_into().expect("slice with incorrect length"),
+        ))
     }
 
     type Item = u32;
@@ -176,8 +190,10 @@ impl SerializableSchema for u64 {
 
 impl DeserializableSchema for u64 {
     #[inline(always)]
-    fn deserialize() -> Result<u64, std::convert::Infallible> {
-        Ok(10u64)
+    fn deserialize(decoder: &mut crate::codec::decoder::ByteDecoder) -> Result<u64, std::convert::Infallible> {
+        Ok(u64::from_be_bytes(
+            decoder.next(8).try_into().expect("slice with incorrect length"),
+        ))
     }
 
     type Item = u64;
@@ -198,8 +214,10 @@ impl SerializableSchema for f32 {
 
 impl DeserializableSchema for f32 {
     #[inline(always)]
-    fn deserialize() -> Result<f32, std::convert::Infallible> {
-        Ok(10f32)
+    fn deserialize(decoder: &mut crate::codec::decoder::ByteDecoder) -> Result<f32, std::convert::Infallible> {
+        Ok(f32::from_be_bytes(
+            decoder.next(4).try_into().expect("slice with incorrect length"),
+        ))
     }
 
     type Item = f32;
@@ -220,8 +238,10 @@ impl SerializableSchema for f64 {
 
 impl DeserializableSchema for f64 {
     #[inline(always)]
-    fn deserialize() -> Result<f64, std::convert::Infallible> {
-        Ok(10f64)
+    fn deserialize(decoder: &mut crate::codec::decoder::ByteDecoder) -> Result<f64, std::convert::Infallible> {
+        Ok(f64::from_be_bytes(
+            decoder.next(8).try_into().expect("slice with incorrect length"),
+        ))
     }
 
     type Item = f64;
@@ -242,8 +262,13 @@ impl SerializableSchema for String {
 
 impl DeserializableSchema for String {
     #[inline(always)]
-    fn deserialize() -> Result<String, std::convert::Infallible> {
-        Ok(String::new())
+    fn deserialize(decoder: &mut crate::codec::decoder::ByteDecoder) -> Result<String, std::convert::Infallible> {
+        let len = i64::deserialize(decoder).unwrap() as usize;
+        let mut buf = vec![0u8; len];
+
+        buf.copy_from_slice(decoder.next(len));
+
+        Ok(String::from_utf8(buf).unwrap())
     }
 
     type Item = String;
@@ -262,10 +287,17 @@ impl<T: SerializableSchema> SerializableSchema for Vec<T> {
     type Error = std::convert::Infallible;
 }
 
-impl<T: DeserializableSchema> DeserializableSchema for Vec<T> {
+impl<T: DeserializableSchema<Item = T, Error = std::convert::Infallible>> DeserializableSchema for Vec<T> {
     #[inline(always)]
-    fn deserialize() -> Result<Vec<T>, std::convert::Infallible> {
-        Ok(Vec::new())
+    fn deserialize(decoder: &mut crate::codec::decoder::ByteDecoder) -> Result<Vec<T>, std::convert::Infallible> {
+        let len = i64::deserialize(decoder).unwrap() as usize;
+        let mut result = Vec::with_capacity(len);
+
+        for _ in 0..len {
+            result.push(T::deserialize(decoder).unwrap());
+        }
+
+        Ok(result)
     }
 
     type Item = Vec<T>;

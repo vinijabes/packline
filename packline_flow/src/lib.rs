@@ -1,17 +1,17 @@
 use std::net::SocketAddr;
 
 use async_trait::async_trait;
+use codec::FlowCodec;
 pub use flow_derive::*;
 use futures::stream::StreamExt;
 use packline_core::app::App;
 use packline_core::connector::{TCPConnectionHandler, TCPConnectorHandler};
 pub use schema::{DeserializableSchema, Schema, SerializableSchema, SizedSchema};
 use tokio::net::TcpStream;
-use tokio_util::codec::{BytesCodec, Framed};
+use tokio_util::codec::Framed;
 
+pub mod codec;
 pub mod messages;
-pub mod request;
-pub mod response;
 pub mod schema;
 
 pub(crate) mod flow {
@@ -41,7 +41,7 @@ impl<'a> TCPConnectorHandler for FlowConnector<'a> {
 impl TCPConnectionHandler for FlowConnectionHandler {
     async fn handle(&mut self) {
         println!("New Flow Connection: {}", self.addr);
-        let mut framed = Framed::new(std::mem::replace(&mut self.stream, None).unwrap(), BytesCodec::new());
+        let mut framed = Framed::new(std::mem::replace(&mut self.stream, None).unwrap(), FlowCodec::new());
 
         loop {
             let packet = framed.next().await;
