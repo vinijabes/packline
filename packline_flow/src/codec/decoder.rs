@@ -1,18 +1,27 @@
 use bytes::BytesMut;
 use tokio_util::codec::Decoder;
 
+use crate::messages::Message;
+use crate::DeserializableSchema;
+
 impl Decoder for super::FlowCodec {
     type Item = crate::messages::Message;
     type Error = std::io::Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        let offset = {
-            let decoder = ByteDecoder::new(src);
-            decoder.offset
+        let (result, offset) = {
+            let mut decoder = ByteDecoder::new(src);
+            let result = Message::deserialize(&mut decoder).unwrap();
+            (result, decoder.offset)
         };
 
-        let _ = src.split_to(offset);
-        Ok(None)
+        Ok(result.and_then(|message| match message {
+            Message::Invalid => None,
+            _ => {
+                let _ = src.split_to(offset);
+                Some(message)
+            }
+        }))
     }
 }
 
@@ -30,6 +39,10 @@ impl<'a> ByteDecoder<'a> {
         let result = &self.buf[self.offset..self.offset + size];
         self.offset += size;
         result
+    }
+
+    pub fn len(&self) -> usize {
+        self.buf.len()
     }
 }
 

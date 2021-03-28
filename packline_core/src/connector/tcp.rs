@@ -16,7 +16,7 @@ pub trait TCPConnectorHandler: Send {
 
 #[async_trait]
 pub trait TCPConnectionHandler: Send {
-    async fn handle(&mut self);
+    async fn handle(&mut self) -> Result<(), Error>;
 }
 
 pub struct TCPConnector {
@@ -51,7 +51,7 @@ impl Connector for TCPConnector {
                 let mut conn_handler = self.handler.handle_connection(res.unwrap());
 
                 handle.spawn(async move {
-                    conn_handler.handle().await;
+                    let _ = conn_handler.handle().await.map_err(|e| println!("{:#?}", e));
                 });
             }
 

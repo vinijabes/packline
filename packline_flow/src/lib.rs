@@ -39,18 +39,20 @@ impl<'a> TCPConnectorHandler for FlowConnector<'a> {
 
 #[async_trait]
 impl TCPConnectionHandler for FlowConnectionHandler {
-    async fn handle(&mut self) {
+    async fn handle(&mut self) -> Result<(), std::io::Error> {
         println!("New Flow Connection: {}", self.addr);
+
         let mut framed = Framed::new(std::mem::replace(&mut self.stream, None).unwrap(), FlowCodec::new());
 
         loop {
             let packet = framed.next().await;
             match packet {
                 None => break,
-                Some(r) => println!("{:#?}", r),
+                Some(r) => println!("{:#?}", r?),
             }
         }
 
         println!("Flow connection finished");
+        Ok(())
     }
 }
