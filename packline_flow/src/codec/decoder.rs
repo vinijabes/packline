@@ -36,7 +36,13 @@ impl<'a> ByteDecoder<'a> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::schema::DeserializableSchema;
+    use crate::{FlowDeserializable, FlowSerializable, FlowSized};
+    use flow::DeserializableSchema;
+
+    mod flow {
+        pub use crate::codec;
+        pub use crate::flow::*;
+    }
 
     #[test]
     fn test_decode_i8_from_bytes() {
@@ -153,5 +159,28 @@ mod test {
         let result = Vec::<i8>::deserialize(&mut decoder).unwrap();
 
         assert_eq!(vec![42i8, 42i8, 42i8, 42i8], result)
+    }
+
+    #[test]
+    fn test_decode_struct_from_bytes() {
+        #[derive(FlowDeserializable, FlowSerializable, FlowSized)]
+        struct TestingData {
+            x: i8,
+            y: i16,
+            z: i32,
+        }
+
+        let buf = [
+            42u8, //x value
+            42u8, 42u8, //y value
+            42u8, 42u8, 42u8, 42u8, //z value
+        ];
+
+        let mut decoder = ByteDecoder::new(&buf);
+        let result = TestingData::deserialize(&mut decoder).unwrap();
+
+        assert_eq!(42i8, result.x);
+        assert_eq!((42i16 << 8) + 42i16, result.y);
+        assert_eq!((42i32 << 24) + (42i32 << 16) + (42i32 << 8) + 42i32, result.z);
     }
 }

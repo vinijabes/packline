@@ -12,7 +12,7 @@ pub fn expand_derive_deserializable_schema(input: syn::DeriveInput) -> Result<To
 
     let expanded = quote! {
         impl #impl_generics flow::DeserializableSchema for #name #ty_generics #where_clause{
-            fn deserialize(_decoder: &mut flow::codec::decoder::ByteDecoder) -> Result<Self::Item, Self::Error> {
+            fn deserialize(decoder: &mut flow::codec::decoder::ByteDecoder) -> Result<Self::Item, Self::Error> {
                 #expand_deserialize
             }
 
@@ -81,7 +81,7 @@ fn deserialize(struct_name: &proc_macro2::Ident, data: &Data) -> TokenStream {
                     let ty = &f.ty;
 
                     quote_spanned! {f.span()=>
-                        let #name = #ty::deserialize().unwrap();
+                        let #name = #ty::deserialize(decoder).unwrap();
                     }
                 });
 
