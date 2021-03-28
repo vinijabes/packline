@@ -30,10 +30,13 @@ pub fn expand_derive_serializable_schema(input: syn::DeriveInput) -> Result<Toke
     let generics = add_trait_bounds(input.generics);
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
+    let expand_serialize = serialize(&input.data);
+
     let expanded = quote! {
         // ...
         impl #impl_generics flow::SerializableSchema for #name #ty_generics #where_clause{
-            fn serialize(&self) {
+            fn serialize(&self, encoder: &mut bytes::BytesMut) {
+                #expand_serialize
             }
 
             type Error = std::convert::Infallible;
@@ -102,6 +105,32 @@ fn deserialize(struct_name: &proc_macro2::Ident, data: &Data) -> TokenStream {
                             #(#recurse_fields),*
                         }
                     )
+                }
+            }
+            Fields::Unnamed(_) => unimplemented!(),
+            Fields::Unit => unimplemented!(),
+        },
+        Data::Enum(_) | Data::Union(_) => unimplemented!(),
+    }
+}
+
+fn serialize(data: &Data) -> TokenStream {
+    match *data {
+        Data::Struct(ref data) => match data.fields {
+            Fields::Named(ref fields) => {
+                let recurse_serialize = fields.named.iter().map(|f| {
+                    let name = &f.ident;
+                    let ty = &f.ty;
+
+                    quote_spanned! {f.span()=>
+                        #ty::serialize(&self.#name, encoder);
+                    }
+                });
+
+                quote! {
+                    #(
+                        #recurse_serialize
+                    )*
                 }
             }
             Fields::Unnamed(_) => unimplemented!(),

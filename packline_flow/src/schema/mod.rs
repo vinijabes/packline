@@ -1,3 +1,4 @@
+use bytes::{BufMut, BytesMut};
 use std::convert::TryInto;
 
 pub enum Types {
@@ -22,7 +23,7 @@ pub trait SizedSchema {
 }
 
 pub trait SerializableSchema: SizedSchema {
-    fn serialize(&self);
+    fn serialize(&self, encoder: &mut BytesMut);
 
     type Error;
 }
@@ -39,7 +40,9 @@ pub trait DeserializableSchema: SizedSchema {
 pub trait Schema: SerializableSchema + DeserializableSchema {}
 
 impl SerializableSchema for i8 {
-    fn serialize(&self) {}
+    fn serialize(&self, encoder: &mut BytesMut) {
+        encoder.put_i8(*self);
+    }
 
     type Error = std::convert::Infallible;
 }
@@ -63,7 +66,9 @@ impl SizedSchema for i8 {
 }
 
 impl SerializableSchema for i16 {
-    fn serialize(&self) {}
+    fn serialize(&self, encoder: &mut BytesMut) {
+        encoder.put_i16(*self);
+    }
 
     type Error = std::convert::Infallible;
 }
@@ -87,7 +92,9 @@ impl SizedSchema for i16 {
 }
 
 impl SerializableSchema for i32 {
-    fn serialize(&self) {}
+    fn serialize(&self, encoder: &mut BytesMut) {
+        encoder.put_i32(*self);
+    }
 
     type Error = std::convert::Infallible;
 }
@@ -111,7 +118,9 @@ impl SizedSchema for i32 {
 }
 
 impl SerializableSchema for i64 {
-    fn serialize(&self) {}
+    fn serialize(&self, encoder: &mut BytesMut) {
+        encoder.put_i64(*self);
+    }
 
     type Error = std::convert::Infallible;
 }
@@ -135,7 +144,9 @@ impl SizedSchema for i64 {
 }
 
 impl SerializableSchema for u16 {
-    fn serialize(&self) {}
+    fn serialize(&self, encoder: &mut BytesMut) {
+        encoder.put_u16(*self);
+    }
 
     type Error = std::convert::Infallible;
 }
@@ -159,7 +170,9 @@ impl SizedSchema for u16 {
 }
 
 impl SerializableSchema for u32 {
-    fn serialize(&self) {}
+    fn serialize(&self, encoder: &mut BytesMut) {
+        encoder.put_u32(*self);
+    }
 
     type Error = std::convert::Infallible;
 }
@@ -183,7 +196,9 @@ impl SizedSchema for u32 {
 }
 
 impl SerializableSchema for u64 {
-    fn serialize(&self) {}
+    fn serialize(&self, encoder: &mut BytesMut) {
+        encoder.put_u64(*self);
+    }
 
     type Error = std::convert::Infallible;
 }
@@ -207,7 +222,9 @@ impl SizedSchema for u64 {
 }
 
 impl SerializableSchema for f32 {
-    fn serialize(&self) {}
+    fn serialize(&self, encoder: &mut BytesMut) {
+        encoder.put_f32(*self);
+    }
 
     type Error = std::convert::Infallible;
 }
@@ -231,7 +248,9 @@ impl SizedSchema for f32 {
 }
 
 impl SerializableSchema for f64 {
-    fn serialize(&self) {}
+    fn serialize(&self, encoder: &mut BytesMut) {
+        encoder.put_f64(*self);
+    }
 
     type Error = std::convert::Infallible;
 }
@@ -255,7 +274,10 @@ impl SizedSchema for f64 {
 }
 
 impl SerializableSchema for String {
-    fn serialize(&self) {}
+    fn serialize(&self, encoder: &mut BytesMut) {
+        (self.len() as i64).serialize(encoder);
+        encoder.put(self.as_bytes());
+    }
 
     type Error = std::convert::Infallible;
 }
@@ -282,7 +304,12 @@ impl SizedSchema for String {
 }
 
 impl<T: SerializableSchema> SerializableSchema for Vec<T> {
-    fn serialize(&self) {}
+    fn serialize(&self, encoder: &mut BytesMut) {
+        (self.size() as i64).serialize(encoder);
+        for i in self {
+            i.serialize(encoder);
+        }
+    }
 
     type Error = std::convert::Infallible;
 }

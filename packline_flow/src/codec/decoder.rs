@@ -6,12 +6,12 @@ impl Decoder for super::FlowCodec {
     type Error = std::io::Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        let mut decoder = ByteDecoder { offset: 0, buf: src };
+        let offset = {
+            let decoder = ByteDecoder::new(src);
+            decoder.offset
+        };
 
-        let mut x = vec![0u8; 4];
-        let buf = decoder.next(4);
-        x[..4].clone_from_slice(buf);
-        println!("{}", String::from_utf8(x).unwrap());
+        let _ = src.split_to(offset);
         Ok(None)
     }
 }
@@ -36,7 +36,7 @@ impl<'a> ByteDecoder<'a> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{FlowDeserializable, FlowSerializable, FlowSized};
+    use crate::{FlowDeserializable, FlowSized};
     use flow::DeserializableSchema;
 
     mod flow {
@@ -163,7 +163,7 @@ mod test {
 
     #[test]
     fn test_decode_struct_from_bytes() {
-        #[derive(FlowDeserializable, FlowSerializable, FlowSized)]
+        #[derive(FlowDeserializable, FlowSized)]
         struct TestingData {
             x: i8,
             y: i16,
