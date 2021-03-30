@@ -1,13 +1,13 @@
 use bytes::BytesMut;
 use tokio_util::codec::Encoder;
 
-use crate::messages::Message;
+use crate::messages::Packet;
 use crate::{SerializableSchema, SizedSchema};
 
-impl Encoder<Message> for super::FlowCodec {
+impl Encoder<Packet> for super::FlowCodec {
     type Error = std::io::Error;
 
-    fn encode(&mut self, input: Message, output: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, input: Packet, output: &mut BytesMut) -> Result<(), Self::Error> {
         output.reserve(input.size());
         input.serialize(output);
 

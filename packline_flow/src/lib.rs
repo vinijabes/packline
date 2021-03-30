@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use codec::FlowCodec;
 pub use flow_derive::*;
 use futures::stream::StreamExt;
+use futures::SinkExt;
 use packline_core::app::App;
 use packline_core::connector::{TCPConnectionHandler, TCPConnectorHandler};
 pub use schema::{DeserializableSchema, Schema, SerializableSchema, SizedSchema};
@@ -48,7 +49,10 @@ impl TCPConnectionHandler for FlowConnectionHandler {
             let packet = framed.next().await;
             match packet {
                 None => break,
-                Some(r) => println!("{:#?}", r?),
+                Some(r) => {
+                    let packet = r?;
+                    let _ = framed.send(packet).await;
+                }
             }
         }
 

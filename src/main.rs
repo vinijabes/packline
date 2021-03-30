@@ -1,4 +1,5 @@
 use futures::FutureExt;
+use packline_cli::client::connect;
 use packline_core::app::App;
 use packline_core::connector::{Connector, TCPConnector};
 use packline_flow::FlowConnector;
@@ -14,6 +15,11 @@ async fn main() {
         let (_tx, rx) = tokio::sync::oneshot::channel();
 
         let mut connector = TCPConnector::new(Box::new(FlowConnector { app: &App {} }));
+
+        tokio::spawn(async {
+            let client = connect("127.0.0.1:1883").await;
+        });
+
         connector
             .run(app, tokio::runtime::Handle::current(), &mut rx.fuse())
             .await;
