@@ -23,13 +23,13 @@ pub struct Iter {}
 
 #[async_trait]
 impl AsyncIterator<u32> for Iter {
-    async fn next_count(&mut self, count: usize) -> Vec<u32> {
+    async fn next_count(&mut self, _count: usize) -> Vec<u32> {
         vec![42u32]
     }
 }
 
 impl ChannelStorage for VecStorage {
-    fn new(app: &mut crate::app::App, channel: &mut Channel) -> Self {
+    fn new(_app: &mut crate::app::App, _channel: &mut Channel) -> Self {
         VecStorage { data: Vec::new() }
     }
 
@@ -37,7 +37,7 @@ impl ChannelStorage for VecStorage {
         self.data.append(elements);
     }
 
-    fn dequeue(&mut self, count: usize) -> Vec<u32> {
+    fn dequeue(&mut self, _count: usize) -> Vec<u32> {
         Vec::new()
     }
 

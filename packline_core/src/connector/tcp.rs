@@ -25,7 +25,7 @@ pub struct TCPConnector {
 
 impl TCPConnector {
     pub fn new(handler: Box<dyn TCPConnectorHandler>) -> TCPConnector {
-        TCPConnector { handler: handler }
+        TCPConnector { handler }
     }
 }
 

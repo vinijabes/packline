@@ -21,7 +21,7 @@ pub fn expand_derive_deserializable_schema(input: syn::DeriveInput) -> Result<To
         }
     };
 
-    Ok(TokenStream::from(expanded))
+    Ok(expanded)
 }
 
 pub fn expand_derive_serializable_schema(input: syn::DeriveInput) -> Result<TokenStream, Vec<syn::Error>> {
@@ -43,7 +43,7 @@ pub fn expand_derive_serializable_schema(input: syn::DeriveInput) -> Result<Toke
         }
     };
 
-    Ok(TokenStream::from(expanded))
+    Ok(expanded)
 }
 
 pub fn expand_derive_sized_schema(input: syn::DeriveInput) -> Result<TokenStream, Vec<syn::Error>> {
@@ -63,7 +63,7 @@ pub fn expand_derive_sized_schema(input: syn::DeriveInput) -> Result<TokenStream
         }
     };
 
-    Ok(TokenStream::from(expanded))
+    Ok(expanded)
 }
 
 fn add_trait_bounds(mut generics: Generics) -> Generics {
