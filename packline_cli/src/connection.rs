@@ -31,7 +31,7 @@ impl Connection {
                         let mut request_table = clone.lock().await;
                         let sender = request_table.remove(&packet.context_id);
 
-                        sender.unwrap().send(packet);
+                        let _ = sender.unwrap().send(packet);
                     }
                 }
             }
@@ -49,7 +49,7 @@ impl Connection {
             requests_table.insert(packet.context_id, tx);
         }
 
-        self.sink.send(packet).await;
+        let _ = self.sink.send(packet).await;
 
         rx.await
             .map(|packet| packet.message)

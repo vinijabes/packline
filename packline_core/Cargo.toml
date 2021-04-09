@@ -5,9 +5,11 @@ authors = ["Vinícius Jabes <vinijabes@gmail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[dev-dependencies]
+tokio-test = "0.4.0"
 
 [dependencies]
-tokio = { version = "1.4.0", features = ["process"] }
+tokio = { version = "1.4.0", features = ["process", "net"] }
 async-trait = {version = "0.1.48"}
 futures = "0.3.13"
 

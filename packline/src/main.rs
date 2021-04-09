@@ -1,15 +1,15 @@
 use futures::FutureExt;
 use packline_cli::client::connect;
+use packline_core::app::channel::storage::VecStorage;
+use packline_core::app::channel::Channel;
 use packline_core::app::App;
 use packline_core::connector::{Connector, TCPConnector};
 use packline_flow::FlowConnector;
 
-mod core;
-
 #[tokio::main]
 async fn main() {
     let _ = tokio::spawn(async {
-        let app = &mut packline_core::app::App {};
+        let mut app = &mut packline_core::app::App {};
 
         //TODO: detect program shutdown step and send oneshot signal.
         let (_tx, rx) = tokio::sync::oneshot::channel();
@@ -17,7 +17,7 @@ async fn main() {
         let mut connector = TCPConnector::new(Box::new(FlowConnector { app: &App {} }));
 
         tokio::spawn(async {
-            let client = connect("127.0.0.1:1883").await;
+            let _ = connect("127.0.0.1:1883").await;
         });
 
         connector
