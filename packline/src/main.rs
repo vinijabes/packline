@@ -3,7 +3,7 @@ use packline_cli::client::connect;
 
 use packline_core::app::App;
 use packline_core::connector::{Connector, TCPConnector};
-use packline_flow::FlowConnector;
+use packline_flow::connector::FlowConnector;
 
 #[tokio::main]
 async fn main() {
