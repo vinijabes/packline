@@ -5,6 +5,7 @@ use packline_flow::messages::Message;
 
 use crate::connection::Connection;
 
+use packline_flow::messages::subscribe::SubscribeTopicV1;
 use tokio::runtime::Handle;
 use tokio::sync::mpsc::channel;
 use tokio::sync::mpsc::Receiver;
@@ -42,6 +43,16 @@ impl Client {
     where
         F: Fn() -> () + Send + 'static,
     {
+        self.connection
+            .send(
+                (2, 1),
+                Message::SubscribeTopicV1(SubscribeTopicV1 {
+                    topic: topic.clone(),
+                    consumer_group_id: "".to_string(),
+                }),
+            )
+            .await;
+
         self.consumer_worker.send((topic, Box::new(handler))).await;
     }
 

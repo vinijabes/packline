@@ -4,10 +4,12 @@ use rand::random;
 use std::convert::Infallible;
 
 pub mod connect;
+pub mod subscribe;
 
 #[derive(Debug)]
 pub enum Message {
     ConnectRequestV1(connect::ConnectRequestV1),
+    SubscribeTopicV1(subscribe::SubscribeTopicV1),
     Invalid,
 }
 
@@ -26,6 +28,7 @@ impl SerializableSchema for Message {
     fn serialize(&self, encoder: &mut BytesMut) {
         match self {
             Message::ConnectRequestV1(m) => m.serialize(encoder),
+            Message::SubscribeTopicV1(m) => m.serialize(encoder),
             _ => (),
         };
     }
@@ -36,6 +39,7 @@ pub type RouteVersion = u16;
 
 pub type RouteWithVersion = (Route, RouteVersion);
 
+#[derive(Debug)]
 pub struct Packet {
     route: RouteWithVersion,
     pub context_id: u32,
@@ -79,6 +83,7 @@ impl DeserializableSchema for Packet {
 
         let message = match (route, version) {
             (1, 1) => Message::ConnectRequestV1(connect::ConnectRequestV1::deserialize(decoder).unwrap()),
+            (2, 1) => Message::SubscribeTopicV1(subscribe::SubscribeTopicV1::deserialize(decoder).unwrap()),
             _ => Message::Invalid,
         };
 

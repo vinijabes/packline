@@ -65,6 +65,11 @@ impl TCPConnectionHandler for FlowConnectionHandler {
 
 impl FlowConnectionHandler {
     fn handle_packet(packet: Packet) -> Result<Packet, std::io::Error> {
-        Ok(packet)
+        use super::messages::Message;
+
+        match &packet.message {
+            Message::SubscribeTopicV1(c) => Ok(packet),
+            _ => Ok(packet),
+        }
     }
 }
