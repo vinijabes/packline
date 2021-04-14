@@ -9,7 +9,7 @@ use tokio::net::TcpStream;
 use tokio::runtime::Handle;
 use tokio::sync::Mutex;
 use tokio_util::codec::Framed;
-use tracing::info;
+use tracing::{debug, info};
 
 use packline_core::app::App;
 use packline_core::connector::{TCPConnectionHandler, TCPConnectorHandler};
@@ -21,6 +21,7 @@ pub struct FlowConnector<'a> {
     pub app: &'a App,
 }
 
+#[cfg_attr(debug_assertions, derive(Debug))]
 pub struct FlowConnectionHandler {
     addr: SocketAddr,
     stream: Option<TcpStream>,
@@ -36,15 +37,17 @@ impl<'a> TCPConnectorHandler for FlowConnector<'a> {
     }
 }
 
+#[cfg_attr(debug_assertions, derive(Debug))]
 pub struct ConnectionState {
     sink: Mutex<SplitSink<Framed<TcpStream, FlowCodec>, Packet>>,
 }
 
 #[async_trait]
 impl TCPConnectionHandler for FlowConnectionHandler {
+    #[cfg_attr(debug_assertions, tracing::instrument)]
     async fn handle(&mut self) -> Result<(), std::io::Error> {
         let handle = Handle::current();
-        info!("New Flow Connection: {}", self.addr);
+        debug!("New Flow Connection: {}", self.addr);
 
         let mut framed = Framed::new(std::mem::replace(&mut self.stream, None).unwrap(), FlowCodec::new());
         let (mut sink, mut stream) = framed.split();
@@ -61,22 +64,26 @@ impl TCPConnectionHandler for FlowConnectionHandler {
                         let packet = FlowConnectionHandler::handle_packet(state.clone(), r.unwrap()).unwrap();
                         {
                             let mut sink = state.sink.lock().await;
-                            let _ = sink.send(packet).await;
+                            let result = sink.send(packet).await;
+
+                            debug!("Wrote to stream; success={:?}", result.is_ok());
                         }
                     });
                 }
             }
         }
 
-        info!("Flow connection finished");
+        debug!("Flow connection finished");
         Ok(())
     }
 }
 
 impl FlowConnectionHandler {
+    #[cfg_attr(debug_assertions, tracing::instrument)]
     fn handle_packet(state: Arc<ConnectionState>, packet: Packet) -> Result<Packet, std::io::Error> {
         use super::messages::Message;
 
+        info!("handling packet");
         match &packet.message {
             Message::SubscribeTopicRequestV1(c) => Ok(packet),
             _ => Ok(packet),
