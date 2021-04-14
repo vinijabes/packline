@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 packline_flow = { path = "../packline_flow" }
+log = "0.4"
 
 tokio = { version = "1.4.0", features = ["process"] }
 tokio-util = {version = "0.6.5", features = ["codec"]}

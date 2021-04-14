@@ -5,7 +5,8 @@ use packline_flow::messages::Message;
 
 use crate::connection::Connection;
 
-use packline_flow::messages::subscribe::SubscribeTopicV1;
+use log::debug;
+use packline_flow::messages::subscribe::SubscribeTopicRequestV1;
 use tokio::runtime::Handle;
 use tokio::sync::mpsc::channel;
 use tokio::sync::mpsc::Receiver;
@@ -46,7 +47,7 @@ impl Client {
         self.connection
             .send(
                 (2, 1),
-                Message::SubscribeTopicV1(SubscribeTopicV1 {
+                Message::SubscribeTopicRequestV1(SubscribeTopicRequestV1 {
                     topic: topic.clone(),
                     consumer_group_id: "".to_string(),
                 }),
@@ -60,14 +61,14 @@ impl Client {
     where
         F: Fn() -> (),
     {
-        println!("Starting consumer worker {:?}", rx);
+        debug!("Starting consumer worker {:?}", rx);
 
         while let Some((topic, handler)) = rx.recv().await {
-            println!("{}", topic);
+            debug!("{}", topic);
 
             //TODO: start a stream between client and server.
         }
 
-        println!("Stopping consumer worker {:?}", rx);
+        debug!("Stopping consumer worker {:?}", rx);
     }
 }

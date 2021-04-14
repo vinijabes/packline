@@ -1,13 +1,21 @@
-use futures::FutureExt;
-use packline_cli::client::connect;
+use std::error::Error;
+use std::thread::yield_now;
 
+use futures::FutureExt;
+use tracing::{debug, info};
+
+use packline_cli::client::connect;
 use packline_core::app::App;
 use packline_core::connector::{Connector, TCPConnector};
 use packline_flow::connector::FlowConnector;
-use std::thread::yield_now;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::DEBUG)
+        .try_init()?;
+
+    info!("Starting Packline");
     let _ = tokio::spawn(async {
         let app = &mut packline_core::app::App {};
 
@@ -21,7 +29,7 @@ async fn main() {
             let mut client = connect("127.0.0.1:1883").await.unwrap();
             client
                 .consume("testing_topic".to_string(), || {
-                    println!("Handling packets");
+                    debug!("Handling packets");
                 })
                 .await;
 
@@ -33,7 +41,9 @@ async fn main() {
             .await;
 
         client_tx.send(true);
-        println!("After run!")
+        info!("After run!")
     })
     .await;
+
+    Ok(())
 }

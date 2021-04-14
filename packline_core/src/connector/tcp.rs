@@ -6,6 +6,7 @@ use futures::{future::Fuse, select, FutureExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime::Handle;
 use tokio::sync::oneshot::Receiver;
+use tracing::debug;
 
 use super::{App, Connector};
 
@@ -32,7 +33,7 @@ impl TCPConnector {
 #[async_trait]
 impl Connector for TCPConnector {
     async fn run(&mut self, _: &mut App, handle: Handle, mut signal: &mut Fuse<Receiver<bool>>) {
-        println!("Running TCPConnector");
+        debug!("Running TCPConnector");
 
         let address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 1883); // localhost:1883
         let listener = TcpListener::bind(address).await.unwrap();

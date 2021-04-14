@@ -1,16 +1,21 @@
-use crate::codec::FlowCodec;
-use crate::messages::Packet;
-use async_trait::async_trait;
-use futures::stream::StreamExt;
-use futures::SinkExt;
-use packline_core::app::App;
-use packline_core::connector::{TCPConnectionHandler, TCPConnectorHandler};
 use std::net::SocketAddr;
 use std::sync::Arc;
+
+use async_trait::async_trait;
+use futures::stream::SplitSink;
+use futures::stream::StreamExt;
+use futures::SinkExt;
 use tokio::net::TcpStream;
 use tokio::runtime::Handle;
 use tokio::sync::Mutex;
 use tokio_util::codec::Framed;
+use tracing::info;
+
+use packline_core::app::App;
+use packline_core::connector::{TCPConnectionHandler, TCPConnectorHandler};
+
+use crate::codec::FlowCodec;
+use crate::messages::Packet;
 
 pub struct FlowConnector<'a> {
     pub app: &'a App,
@@ -31,26 +36,31 @@ impl<'a> TCPConnectorHandler for FlowConnector<'a> {
     }
 }
 
+pub struct ConnectionState {
+    sink: Mutex<SplitSink<Framed<TcpStream, FlowCodec>, Packet>>,
+}
+
 #[async_trait]
 impl TCPConnectionHandler for FlowConnectionHandler {
     async fn handle(&mut self) -> Result<(), std::io::Error> {
-        println!("New Flow Connection: {}", self.addr);
+        let handle = Handle::current();
+        info!("New Flow Connection: {}", self.addr);
 
         let mut framed = Framed::new(std::mem::replace(&mut self.stream, None).unwrap(), FlowCodec::new());
         let (mut sink, mut stream) = framed.split();
 
-        let rc_sink = Arc::new(Mutex::new(sink));
+        let rc_state = Arc::new(ConnectionState { sink: Mutex::new(sink) });
 
         loop {
             let packet = stream.next().await;
             match packet {
                 None => break,
                 Some(r) => {
-                    let mut sink = rc_sink.clone();
-                    Handle::current().spawn(async move {
-                        let packet = FlowConnectionHandler::handle_packet(r.unwrap()).unwrap();
+                    let mut state = rc_state.clone();
+                    handle.spawn(async move {
+                        let packet = FlowConnectionHandler::handle_packet(state.clone(), r.unwrap()).unwrap();
                         {
-                            let mut sink = sink.lock().await;
+                            let mut sink = state.sink.lock().await;
                             let _ = sink.send(packet).await;
                         }
                     });
@@ -58,17 +68,17 @@ impl TCPConnectionHandler for FlowConnectionHandler {
             }
         }
 
-        println!("Flow connection finished");
+        info!("Flow connection finished");
         Ok(())
     }
 }
 
 impl FlowConnectionHandler {
-    fn handle_packet(packet: Packet) -> Result<Packet, std::io::Error> {
+    fn handle_packet(state: Arc<ConnectionState>, packet: Packet) -> Result<Packet, std::io::Error> {
         use super::messages::Message;
 
         match &packet.message {
-            Message::SubscribeTopicV1(c) => Ok(packet),
+            Message::SubscribeTopicRequestV1(c) => Ok(packet),
             _ => Ok(packet),
         }
     }

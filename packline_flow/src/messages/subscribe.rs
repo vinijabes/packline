@@ -7,7 +7,7 @@ pub mod flow {
 
 #[derive(FlowDeserializable, FlowSerializable, FlowSized)]
 #[cfg_attr(debug_assertions, derive(Debug))]
-pub struct SubscribeTopicV1 {
+pub struct SubscribeTopicRequestV1 {
     pub topic: String,
     pub consumer_group_id: String,
 }

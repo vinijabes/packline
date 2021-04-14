@@ -9,7 +9,7 @@ pub mod subscribe;
 #[derive(Debug)]
 pub enum Message {
     ConnectRequestV1(connect::ConnectRequestV1),
-    SubscribeTopicV1(subscribe::SubscribeTopicV1),
+    SubscribeTopicRequestV1(subscribe::SubscribeTopicRequestV1),
     Invalid,
 }
 
@@ -28,7 +28,7 @@ impl SerializableSchema for Message {
     fn serialize(&self, encoder: &mut BytesMut) {
         match self {
             Message::ConnectRequestV1(m) => m.serialize(encoder),
-            Message::SubscribeTopicV1(m) => m.serialize(encoder),
+            Message::SubscribeTopicRequestV1(m) => m.serialize(encoder),
             _ => (),
         };
     }
@@ -83,7 +83,9 @@ impl DeserializableSchema for Packet {
 
         let message = match (route, version) {
             (1, 1) => Message::ConnectRequestV1(connect::ConnectRequestV1::deserialize(decoder).unwrap()),
-            (2, 1) => Message::SubscribeTopicV1(subscribe::SubscribeTopicV1::deserialize(decoder).unwrap()),
+            (2, 1) => {
+                Message::SubscribeTopicRequestV1(subscribe::SubscribeTopicRequestV1::deserialize(decoder).unwrap())
+            }
             _ => Message::Invalid,
         };
 
