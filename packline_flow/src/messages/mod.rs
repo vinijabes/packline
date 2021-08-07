@@ -6,7 +6,7 @@ use std::convert::Infallible;
 pub mod connect;
 pub mod subscribe;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Message {
     ConnectRequestV1(connect::ConnectRequestV1),
     SubscribeTopicRequestV1(subscribe::SubscribeTopicRequestV1),
@@ -39,7 +39,7 @@ pub type RouteVersion = u16;
 
 pub type RouteWithVersion = (Route, RouteVersion);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Packet {
     route: RouteWithVersion,
     pub context_id: u32,

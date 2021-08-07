@@ -1,10 +1,10 @@
-use super::Channel;
+use crate::app::channel::Inner;
 use crate::internal::queue::iterator::AsyncIterator;
 use async_trait::async_trait;
 use std::convert::TryInto;
 
-pub trait ChannelStorage {
-    fn new(app: &mut crate::app::App, channel: &mut Channel) -> Self
+pub(crate) trait ChannelStorage: Send + Sync {
+    fn new(app: &mut crate::app::App, channel: &mut Inner) -> Self
     where
         Self: Sized;
 
@@ -12,7 +12,7 @@ pub trait ChannelStorage {
     fn dequeue(&mut self, count: usize) -> Vec<u32>;
     fn peek(&self, offset: usize, count: usize) -> Vec<u32>;
 
-    fn iter(&self) -> Box<dyn AsyncIterator<u32>>;
+    fn iter(&self) -> Box<dyn AsyncIterator<Item = u32>>;
 }
 
 pub struct VecStorage {
@@ -22,14 +22,15 @@ pub struct VecStorage {
 pub struct Iter {}
 
 #[async_trait]
-impl AsyncIterator<u32> for Iter {
+impl AsyncIterator for Iter {
+    type Item = u32;
     async fn next_count(&mut self, _count: usize) -> Vec<u32> {
         vec![42u32]
     }
 }
 
 impl ChannelStorage for VecStorage {
-    fn new(_app: &mut crate::app::App, _channel: &mut Channel) -> Self {
+    fn new(_app: &mut crate::app::App, _channel: &mut Inner) -> Self {
         VecStorage { data: Vec::new() }
     }
 
@@ -54,7 +55,7 @@ impl ChannelStorage for VecStorage {
         self.data[offset..offset + count].try_into().unwrap()
     }
 
-    fn iter(&self) -> Box<dyn AsyncIterator<u32>> {
+    fn iter(&self) -> Box<dyn AsyncIterator<Item = u32>> {
         Box::new(Iter {})
     }
 }

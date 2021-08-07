@@ -5,6 +5,6 @@ pub mod flow {
     pub use crate::flow::*;
 }
 
-#[derive(FlowDeserializable, FlowSerializable, FlowSized)]
+#[derive(FlowDeserializable, FlowSerializable, FlowSized, Clone)]
 #[cfg_attr(debug_assertions, derive(Debug))]
 pub struct ConnectRequestV1 {}

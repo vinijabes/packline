@@ -1,18 +1,35 @@
+use std::ops::{Deref, DerefMut};
+
+pub use channel::Channel;
+pub(crate) use channel::Inner;
+
 mod channel;
 pub mod consumer;
+pub mod producer;
 pub mod storage;
 
-use consumer::ConsumerStrategy;
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::rc::Rc;
-use storage::ChannelStorage;
+pub struct UnsafeSync<T> {
+    inner: T,
+}
 
-pub struct Channel {
-    pub(super) storage: Option<Rc<RefCell<dyn ChannelStorage>>>,
-    pub(self) consumer_strategy: Option<Rc<RefCell<dyn ConsumerStrategy>>>,
+impl<T> UnsafeSync<T> {
+    fn new(value: T) -> Self {
+        return UnsafeSync { inner: value };
+    }
+}
 
-    pub(self) consumers_offsets: HashMap<u128, usize>,
+impl<T> Deref for UnsafeSync<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<T> DerefMut for UnsafeSync<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
+    }
 }
 
 #[cfg(test)]

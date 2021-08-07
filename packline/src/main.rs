@@ -1,13 +1,15 @@
 use std::error::Error;
 use std::thread::yield_now;
 
-use futures::FutureExt;
+use futures::{AsyncWrite, FutureExt};
 use tracing::{debug, info};
 
 use packline_cli::client::connect;
 use packline_core::app::App;
 use packline_core::connector::{Connector, TCPConnector};
 use packline_flow::connector::FlowConnector;
+use std::sync::Arc;
+use std::cell::{RefCell, Cell};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
@@ -25,8 +27,15 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
 
         let mut connector = TCPConnector::new(Box::new(FlowConnector { app: &App {} }));
 
+        let channel_test = Arc::new(Box::new(packline_core::app::channel::Channel::new(app)));
+        let mut consumer = channel_test.consumer(0);
+        consumer.consume().await;
+        //consumer_test.consume().await;
+
+
         tokio::spawn(async move {
             let mut client = connect("127.0.0.1:1883").await.unwrap();
+
             client
                 .consume("testing_topic".to_string(), || {
                     debug!("Handling packets");

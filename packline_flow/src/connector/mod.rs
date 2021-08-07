@@ -4,18 +4,24 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use futures::stream::SplitSink;
 use futures::stream::StreamExt;
+use futures::task::AtomicWaker;
 use futures::SinkExt;
 use tokio::net::TcpStream;
 use tokio::runtime::Handle;
 use tokio::sync::Mutex;
 use tokio_util::codec::Framed;
-use tracing::{debug, info};
+use tracing::field::debug;
+use tracing::{debug, info, span, trace, Instrument};
 
 use packline_core::app::App;
 use packline_core::connector::{TCPConnectionHandler, TCPConnectorHandler};
 
 use crate::codec::FlowCodec;
-use crate::messages::Packet;
+use crate::messages::{Message, Packet};
+use std::cell::{Ref, RefCell};
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering::{Acquire, Release};
+use std::task::Poll;
 
 pub struct FlowConnector<'a> {
     pub app: &'a App,
@@ -38,7 +44,7 @@ impl<'a> TCPConnectorHandler for FlowConnector<'a> {
 }
 
 #[cfg_attr(debug_assertions, derive(Debug))]
-pub struct ConnectionState {
+struct ConnectionState {
     sink: Mutex<SplitSink<Framed<TcpStream, FlowCodec>, Packet>>,
 }
 
@@ -53,6 +59,10 @@ impl TCPConnectionHandler for FlowConnectionHandler {
         let (mut sink, mut stream) = framed.split();
 
         let rc_state = Arc::new(ConnectionState { sink: Mutex::new(sink) });
+
+        handle.spawn(async {
+            debug!("Starting connection stream handler");
+        });
 
         loop {
             let packet = stream.next().await;
