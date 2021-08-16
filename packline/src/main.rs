@@ -8,8 +8,9 @@ use packline_cli::client::connect;
 use packline_core::app::App;
 use packline_core::connector::{Connector, TCPConnector};
 use packline_flow::connector::FlowConnector;
+use std::cell::{Cell, RefCell};
 use std::sync::Arc;
-use std::cell::{RefCell, Cell};
+use tokio::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
@@ -28,10 +29,18 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         let mut connector = TCPConnector::new(Box::new(FlowConnector { app: &App {} }));
 
         let channel_test = Arc::new(Box::new(packline_core::app::channel::Channel::new(app)));
-        let mut consumer = channel_test.consumer(0);
+        let consumer = channel_test.consumer(0);
+        let mut producer = channel_test.producer();
+
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(1000)).await;
+
+            let mut data = vec![0u32];
+            producer.produce(&mut data).await;
+        });
+
         consumer.consume().await;
         //consumer_test.consume().await;
-
 
         tokio::spawn(async move {
             let mut client = connect("127.0.0.1:1883").await.unwrap();

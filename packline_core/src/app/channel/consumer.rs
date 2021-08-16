@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{RefCell, UnsafeCell};
 use std::collections::LinkedList;
 use std::future::Future;
 use std::pin::Pin;
@@ -64,7 +64,7 @@ struct ConsumerWakerHandle {
 }
 
 impl ConsumerWaker {
-    fn new() -> ConsumerWaker {
+    pub(super) fn new() -> ConsumerWaker {
         ConsumerWaker {
             wakers: Mutex::new(LinkedList::new()),
         }
@@ -89,7 +89,7 @@ impl ConsumerWaker {
         guard.remove(pos);
     }
 
-    pub fn wake(&mut self) {
+    pub fn wake(&self) {
         let mut guard = self.wakers.lock().unwrap();
         if let Some(weak) = guard.pop_front() {
             if let Some(waker) = weak.upgrade() {
@@ -120,7 +120,7 @@ impl Drop for ConsumerWakerHandle {
 }
 
 pub struct Consumer {
-    inner: Arc<UnsafeSync<RefCell<Inner>>>,
+    inner: Arc<UnsafeSync<UnsafeCell<Inner>>>,
     consumer_id: u128,
 
     configs: ConsumerConfigs,
@@ -134,12 +134,12 @@ struct ConsumerConfigs {
 }
 
 impl<'a> Consumer {
-    pub(crate) fn new(inner: Arc<UnsafeSync<RefCell<Inner>>>, consumer_id: u128) -> Self {
+    pub(crate) fn new(inner: Arc<UnsafeSync<UnsafeCell<Inner>>>, consumer_id: u128, waker: Arc<ConsumerWaker>) -> Self {
         Consumer {
             inner,
             consumer_id,
             configs: ConsumerConfigs { timeout: 1000 },
-            waker: Arc::new(ConsumerWaker::new()),
+            waker,
         }
     }
 
@@ -159,7 +159,7 @@ pub struct ConsumerFuture {
     waker_handle: Arc<ConsumerWakerHandle>,
 
     consumer_id: u128,
-    inner: Arc<UnsafeSync<RefCell<Inner>>>,
+    inner: Arc<UnsafeSync<UnsafeCell<Inner>>>,
 
     buffer: Vec<u32>,
 }
@@ -170,7 +170,7 @@ unsafe impl Sync for ConsumerFuture {}
 
 impl<'a> ConsumerFuture {
     fn new(
-        inner: Arc<UnsafeSync<RefCell<Inner>>>,
+        inner: Arc<UnsafeSync<UnsafeCell<Inner>>>,
         handle: Arc<ConsumerWakerHandle>,
         consumer_id: u128,
         timeout: u64,
@@ -211,8 +211,10 @@ impl<'a> Future for ConsumerFuture {
                     let mut_channel = self.inner.clone();
                     self.consumer_future = unsafe {
                         Some(Pin::new_unchecked(Box::new(async move {
-                            let mut inner = mut_channel.borrow_mut();
-                            inner.consume(0, 50).await
+                            unsafe {
+                                let pointer: &mut Inner = &mut *mut_channel.inner.get();
+                                pointer.consume(0, 50).await
+                            }
                         })))
                     };
                 }
