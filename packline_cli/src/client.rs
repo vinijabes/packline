@@ -47,7 +47,8 @@ impl Client {
     where
         F: Fn() -> () + Send + 'static,
     {
-        let _ = self.connection
+        let _ = self
+            .connection
             .send(
                 (2, 1),
                 Message::SubscribeTopicRequestV1(SubscribeTopicRequestV1 {

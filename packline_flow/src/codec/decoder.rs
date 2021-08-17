@@ -49,7 +49,9 @@ impl<'a> ByteDecoder<'a> {
         self.buf.len()
     }
 
-    pub fn is_empty(&self) -> bool { self.buf.is_empty() }
+    pub fn is_empty(&self) -> bool {
+        self.buf.is_empty()
+    }
 }
 
 #[cfg(test)]
