@@ -4,24 +4,18 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use futures::stream::SplitSink;
 use futures::stream::StreamExt;
-use futures::task::AtomicWaker;
 use futures::SinkExt;
 use tokio::net::TcpStream;
 use tokio::runtime::Handle;
 use tokio::sync::Mutex;
 use tokio_util::codec::Framed;
-use tracing::field::debug;
-use tracing::{debug, info, span, trace, Instrument};
+use tracing::{debug, info};
 
 use packline_core::app::App;
 use packline_core::connector::{TCPConnectionHandler, TCPConnectorHandler};
 
 use crate::codec::FlowCodec;
-use crate::messages::{Message, Packet};
-use std::cell::{Ref, RefCell};
-use std::sync::atomic::AtomicUsize;
-use std::sync::atomic::Ordering::{Acquire, Release};
-use std::task::Poll;
+use crate::messages::Packet;
 
 pub struct FlowConnector<'a> {
     pub app: &'a App,
@@ -55,8 +49,8 @@ impl TCPConnectionHandler for FlowConnectionHandler {
         let handle = Handle::current();
         debug!("New Flow Connection: {}", self.addr);
 
-        let mut framed = Framed::new(std::mem::replace(&mut self.stream, None).unwrap(), FlowCodec::new());
-        let (mut sink, mut stream) = framed.split();
+        let framed = Framed::new(std::mem::replace(&mut self.stream, None).unwrap(), FlowCodec::new());
+        let (sink, mut stream) = framed.split();
 
         let rc_state = Arc::new(ConnectionState { sink: Mutex::new(sink) });
 
@@ -69,7 +63,7 @@ impl TCPConnectionHandler for FlowConnectionHandler {
             match packet {
                 None => break,
                 Some(r) => {
-                    let mut state = rc_state.clone();
+                    let state = rc_state.clone();
                     handle.spawn(async move {
                         let packet = FlowConnectionHandler::handle_packet(state.clone(), r.unwrap()).unwrap();
                         {
@@ -95,7 +89,7 @@ impl FlowConnectionHandler {
 
         info!("handling packet");
         match &packet.message {
-            Message::SubscribeTopicRequestV1(c) => Ok(packet),
+            Message::SubscribeTopicRequestV1(_) => Ok(packet),
             _ => Ok(packet),
         }
     }

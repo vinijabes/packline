@@ -3,6 +3,7 @@ use std::ops::{Deref, DerefMut};
 pub use channel::Channel;
 pub(crate) use channel::Inner;
 
+#[allow(clippy::module_inception)]
 mod channel;
 pub mod consumer;
 pub mod producer;
@@ -14,7 +15,7 @@ pub struct UnsafeSync<T> {
 
 impl<T> UnsafeSync<T> {
     fn new(value: T) -> Self {
-        return UnsafeSync { inner: value };
+        UnsafeSync { inner: value }
     }
 }
 

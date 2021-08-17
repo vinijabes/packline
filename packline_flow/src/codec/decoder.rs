@@ -48,6 +48,8 @@ impl<'a> ByteDecoder<'a> {
     pub fn len(&self) -> usize {
         self.buf.len()
     }
+
+    pub fn is_empty(&self) -> bool { self.buf.is_empty() }
 }
 
 #[cfg(test)]

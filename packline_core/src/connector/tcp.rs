@@ -48,8 +48,8 @@ impl Connector for TCPConnector {
                 complete => break,
             };
 
-            if res.is_ok() {
-                let mut conn_handler = self.handler.handle_connection(res.unwrap());
+            if let Ok(conn) = res {
+                let mut conn_handler = self.handler.handle_connection(conn);
 
                 handle.spawn(async move {
                     let _ = conn_handler.handle().await.map_err(|e| println!("{:#?}", e));

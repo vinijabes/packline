@@ -9,3 +9,9 @@ impl FlowCodec {
         FlowCodec {}
     }
 }
+
+impl Default for FlowCodec {
+    fn default() -> Self {
+        FlowCodec::new()
+    }
+}

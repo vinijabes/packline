@@ -15,7 +15,9 @@ use tokio::sync::mpsc::Sender;
 pub struct Client {
     connection: Connection,
 
-    consumer_worker: Sender<(String, Box<Fn() -> () + Send>)>,
+    #[allow(clippy::unused_unit)]
+    consumer_worker: Sender<(String, Box<dyn Fn() -> () + Send>)>,
+    #[allow(dead_code)]
     consumers: Vec<Sender<bool>>,
 }
 
@@ -28,7 +30,7 @@ pub async fn connect<T: ToSocketAddrs>(addr: T) -> Result<Client, Box<dyn std::e
         .send((1, 1), Message::ConnectRequestV1(ConnectRequestV1 {}))
         .await?;
 
-    let (tx, mut rx) = channel(16);
+    let (tx, rx) = channel(16);
 
     Handle::current().spawn(Client::consumer_worker(rx));
 
@@ -40,11 +42,12 @@ pub async fn connect<T: ToSocketAddrs>(addr: T) -> Result<Client, Box<dyn std::e
 }
 
 impl Client {
+    #[allow(clippy::unused_unit)]
     pub async fn consume<F>(&mut self, topic: String, handler: F)
     where
         F: Fn() -> () + Send + 'static,
     {
-        self.connection
+        let _ = self.connection
             .send(
                 (2, 1),
                 Message::SubscribeTopicRequestV1(SubscribeTopicRequestV1 {
@@ -54,16 +57,17 @@ impl Client {
             )
             .await;
 
-        self.consumer_worker.send((topic, Box::new(handler))).await;
+        let _ = self.consumer_worker.send((topic, Box::new(handler))).await;
     }
 
+    #[allow(clippy::unused_unit)]
     async fn consumer_worker<F>(mut rx: Receiver<(String, F)>)
     where
         F: Fn() -> (),
     {
         debug!("Starting consumer worker {:?}", rx);
 
-        while let Some((topic, handler)) = rx.recv().await {
+        while let Some((topic, _)) = rx.recv().await {
             debug!("{}", topic);
 
             //TODO: start a stream between client and server.

@@ -3,8 +3,6 @@ use std::sync::Arc;
 
 use crate::app::channel::{Inner, UnsafeSync};
 
-use super::consumer::ConsumerWaker;
-
 pub struct Producer {
     inner: Arc<UnsafeSync<UnsafeCell<Inner>>>,
 }

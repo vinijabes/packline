@@ -1,16 +1,14 @@
 use std::error::Error;
-use std::thread::yield_now;
+use std::sync::Arc;
 
-use futures::{AsyncWrite, FutureExt};
+use futures::FutureExt;
+use tokio::time::Duration;
 use tracing::{debug, info};
 
 use packline_cli::client::connect;
 use packline_core::app::App;
 use packline_core::connector::{Connector, TCPConnector};
 use packline_flow::connector::FlowConnector;
-use std::cell::{Cell, RefCell};
-use std::sync::Arc;
-use tokio::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
@@ -55,14 +53,14 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
                 })
                 .await;
 
-            client_rx.await;
+            let _ = client_rx.await;
         });
 
-        connector
+        let _ = connector
             .run(app, tokio::runtime::Handle::current(), &mut rx.fuse())
             .await;
 
-        client_tx.send(true);
+        let _ = client_tx.send(true);
         info!("After run!")
     })
     .await;

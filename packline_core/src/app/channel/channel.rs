@@ -35,18 +35,15 @@ impl Channel {
     pub fn new(app: &mut crate::app::App) -> Self {
         let inner = Inner::new(app);
 
-        let channel = Channel {
+        Channel {
             inner: Arc::new(UnsafeSync::new(UnsafeCell::new(inner))),
-        };
-
-        channel
+        }
     }
 
     pub fn consumer(&self, consumer_id: u128) -> Consumer {
         unsafe {
             let pointer: &mut Inner = &mut *self.inner.get();
             Consumer::new(
-                self.inner.clone(),
                 consumer_id,
                 futures::executor::block_on(pointer.consumer_group_handler(consumer_id)),
             )
@@ -84,6 +81,7 @@ impl Inner {
         }
     }
 
+    #[allow(dead_code)]
     pub async fn consume(&mut self, offset: usize, count: usize) -> Option<Vec<u32>> {
         let result = self.consumer_strategy.as_ref().unwrap().borrow().consume(offset, count);
 

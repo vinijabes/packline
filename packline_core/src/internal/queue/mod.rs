@@ -1,5 +1,6 @@
 pub mod iterator;
 
+#[allow(dead_code)]
 pub struct Queue<T> {
     head: Link<T>,
     tail: *mut Node<T>,
@@ -7,13 +8,16 @@ pub struct Queue<T> {
     len: usize,
 }
 
+#[allow(dead_code)]
 type Link<T> = Option<Box<Node<T>>>;
 
+#[allow(dead_code)]
 struct Node<T> {
     elem: T,
     next: Link<T>,
 }
 
+#[allow(dead_code)]
 impl<T> Queue<T> {
     pub fn new() -> Self {
         Queue {

@@ -1,4 +1,4 @@
-use std::cell::{RefCell, UnsafeCell};
+use std::cell::RefCell;
 use std::collections::LinkedList;
 use std::future::Future;
 use std::pin::Pin;
@@ -8,10 +8,11 @@ use std::sync::{Arc, Weak};
 use std::task::{Context, Poll, Waker};
 
 use futures::task::AtomicWaker;
+#[allow(unused_imports)]
 use futures::FutureExt;
 use tokio::time::{self, Duration};
 
-use crate::app::channel::{Inner, UnsafeSync};
+use crate::app::channel::Inner;
 
 use super::channel::ConsumerGroupHandler;
 use super::storage::ChannelStorage;
@@ -47,7 +48,7 @@ impl ConsumerStrategy for BaseConsumerStrategy {
     fn consume(&self, offset: usize, count: usize) -> Option<Vec<u32>> {
         let result = self.storage.borrow().peek(offset, count);
 
-        if result.len() == 0 {
+        if result.is_empty() {
             None
         } else {
             Some(result)
@@ -71,6 +72,7 @@ impl ConsumerWaker {
         }
     }
 
+    #[allow(clippy::redundant_clone)]
     fn handle(self: &Arc<Self>) -> Arc<ConsumerWakerHandle> {
         let handle = Arc::new(ConsumerWakerHandle {
             parent: Arc::downgrade(&self.clone()),
@@ -121,7 +123,7 @@ impl Drop for ConsumerWakerHandle {
 }
 
 pub struct Consumer {
-    inner: Arc<UnsafeSync<UnsafeCell<Inner>>>,
+    #[allow(dead_code)]
     consumer_id: u128,
 
     configs: ConsumerConfigs,
@@ -135,13 +137,8 @@ struct ConsumerConfigs {
 }
 
 impl<'a> Consumer {
-    pub(crate) fn new(
-        inner: Arc<UnsafeSync<UnsafeCell<Inner>>>,
-        consumer_id: u128,
-        handler: Arc<ConsumerGroupHandler>,
-    ) -> Self {
+    pub(crate) fn new(consumer_id: u128, handler: Arc<ConsumerGroupHandler>) -> Self {
         Consumer {
-            inner,
             consumer_id,
             configs: ConsumerConfigs { timeout: 1000 },
             handler,
@@ -150,7 +147,6 @@ impl<'a> Consumer {
 
     pub fn consume(&self) -> ConsumerFuture {
         ConsumerFuture::new(
-            self.inner.clone(),
             self.handler.waker().handle(),
             self.handler.clone(),
             self.configs.timeout,
@@ -158,13 +154,13 @@ impl<'a> Consumer {
     }
 }
 
+type PinConsumerFuture = Pin<Box<dyn Future<Output = Option<Vec<u32>>>>>;
+
 pub struct ConsumerFuture {
     timeout_future: Pin<Box<time::Sleep>>,
-    consumer_future: Option<Pin<Box<dyn Future<Output = Option<Vec<u32>>>>>>,
+    consumer_future: Option<PinConsumerFuture>,
     waker_handle: Arc<ConsumerWakerHandle>,
     handler: Arc<ConsumerGroupHandler>,
-
-    inner: Arc<UnsafeSync<UnsafeCell<Inner>>>,
 
     buffer: Vec<u32>,
 }
@@ -174,25 +170,17 @@ unsafe impl Send for ConsumerFuture {}
 unsafe impl Sync for ConsumerFuture {}
 
 impl<'a> ConsumerFuture {
-    fn new(
-        inner: Arc<UnsafeSync<UnsafeCell<Inner>>>,
-        handle: Arc<ConsumerWakerHandle>,
-        handler: Arc<ConsumerGroupHandler>,
-        timeout: u64,
-    ) -> Self {
+    fn new(handle: Arc<ConsumerWakerHandle>, handler: Arc<ConsumerGroupHandler>, timeout: u64) -> Self {
         let sleep = unsafe { Pin::new_unchecked(Box::new(time::sleep(Duration::from_millis(timeout)))) };
 
-        let consumer = ConsumerFuture {
+        ConsumerFuture {
             timeout_future: sleep,
             consumer_future: None,
             waker_handle: handle,
-            handler: handler,
+            handler,
 
-            inner,
             buffer: Vec::new(),
-        };
-
-        return consumer;
+        }
     }
 }
 
