@@ -203,7 +203,7 @@ impl<'a> Future for ConsumerFuture {
 
                         self.buffer.append(&mut result.unwrap_or(Vec::new()));
 
-                        if !self.buffer.is_empty() {
+                        if self.timeout_future.is_elapsed() && !self.buffer.is_empty() {
                             return Poll::Ready(std::mem::replace(&mut self.buffer, Vec::new()));
                         }
                     }
@@ -211,10 +211,8 @@ impl<'a> Future for ConsumerFuture {
                     let mut_channel = self.inner.clone();
                     self.consumer_future = unsafe {
                         Some(Pin::new_unchecked(Box::new(async move {
-                            unsafe {
-                                let pointer: &mut Inner = &mut *mut_channel.inner.get();
-                                pointer.consume(0, 50).await
-                            }
+                            let pointer: &mut Inner = &mut *mut_channel.inner.get();
+                            pointer.consume(0, 50).await
                         })))
                     };
                 }
@@ -227,7 +225,7 @@ impl<'a> Future for ConsumerFuture {
 
         match self.timeout_future.as_mut().poll(cx) {
             Poll::Pending => Poll::Pending,
-            Poll::Ready(_) => {
+            Poll::Ready(_) => {                
                 if self.buffer.is_empty() {
                     Poll::Pending
                 } else {

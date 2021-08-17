@@ -33,13 +33,17 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         let mut producer = channel_test.producer();
 
         tokio::spawn(async move {
-            tokio::time::sleep(Duration::from_millis(1000)).await;
-
             let mut data = vec![0u32];
+            producer.produce(&mut data).await;
+
+            tokio::time::sleep(Duration::from_millis(100)).await;
+
+            let mut data = vec![10u32];
             producer.produce(&mut data).await;
         });
 
-        consumer.consume().await;
+        let result = consumer.consume().await;
+        println!("{:?}", result);
         //consumer_test.consume().await;
 
         tokio::spawn(async move {
