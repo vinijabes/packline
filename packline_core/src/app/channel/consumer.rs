@@ -13,6 +13,7 @@ use tokio::time::{self, Duration};
 
 use crate::app::channel::{Inner, UnsafeSync};
 
+use super::channel::ConsumerGroupHandler;
 use super::storage::ChannelStorage;
 
 pub(crate) trait ConsumerStrategy: Send + Sync {
@@ -124,7 +125,7 @@ pub struct Consumer {
     consumer_id: u128,
 
     configs: ConsumerConfigs,
-    waker: Arc<ConsumerWaker>,
+    handler: Arc<ConsumerGroupHandler>,
 }
 
 unsafe impl Send for Consumer {}
@@ -134,20 +135,24 @@ struct ConsumerConfigs {
 }
 
 impl<'a> Consumer {
-    pub(crate) fn new(inner: Arc<UnsafeSync<UnsafeCell<Inner>>>, consumer_id: u128, waker: Arc<ConsumerWaker>) -> Self {
+    pub(crate) fn new(
+        inner: Arc<UnsafeSync<UnsafeCell<Inner>>>,
+        consumer_id: u128,
+        handler: Arc<ConsumerGroupHandler>,
+    ) -> Self {
         Consumer {
             inner,
             consumer_id,
             configs: ConsumerConfigs { timeout: 1000 },
-            waker,
+            handler,
         }
     }
 
     pub fn consume(&self) -> ConsumerFuture {
         ConsumerFuture::new(
             self.inner.clone(),
-            self.waker.handle(),
-            self.consumer_id,
+            self.handler.waker().handle(),
+            self.handler.clone(),
             self.configs.timeout,
         )
     }
@@ -157,8 +162,8 @@ pub struct ConsumerFuture {
     timeout_future: Pin<Box<time::Sleep>>,
     consumer_future: Option<Pin<Box<dyn Future<Output = Option<Vec<u32>>>>>>,
     waker_handle: Arc<ConsumerWakerHandle>,
+    handler: Arc<ConsumerGroupHandler>,
 
-    consumer_id: u128,
     inner: Arc<UnsafeSync<UnsafeCell<Inner>>>,
 
     buffer: Vec<u32>,
@@ -172,7 +177,7 @@ impl<'a> ConsumerFuture {
     fn new(
         inner: Arc<UnsafeSync<UnsafeCell<Inner>>>,
         handle: Arc<ConsumerWakerHandle>,
-        consumer_id: u128,
+        handler: Arc<ConsumerGroupHandler>,
         timeout: u64,
     ) -> Self {
         let sleep = unsafe { Pin::new_unchecked(Box::new(time::sleep(Duration::from_millis(timeout)))) };
@@ -181,8 +186,8 @@ impl<'a> ConsumerFuture {
             timeout_future: sleep,
             consumer_future: None,
             waker_handle: handle,
+            handler: handler,
 
-            consumer_id,
             inner,
             buffer: Vec::new(),
         };
@@ -208,11 +213,11 @@ impl<'a> Future for ConsumerFuture {
                         }
                     }
                 } else {
-                    let mut_channel = self.inner.clone();
+                    let mut_channel = self.handler.clone();
                     self.consumer_future = unsafe {
                         Some(Pin::new_unchecked(Box::new(async move {
-                            let pointer: &mut Inner = &mut *mut_channel.inner.get();
-                            pointer.consume(0, 50).await
+                            //let pointer: &mut Inner = &mut *mut_channel.inner.get();
+                            mut_channel.consume(50).await
                         })))
                     };
                 }
@@ -225,7 +230,7 @@ impl<'a> Future for ConsumerFuture {
 
         match self.timeout_future.as_mut().poll(cx) {
             Poll::Pending => Poll::Pending,
-            Poll::Ready(_) => {                
+            Poll::Ready(_) => {
                 if self.buffer.is_empty() {
                     Poll::Pending
                 } else {
