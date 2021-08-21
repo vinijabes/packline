@@ -37,23 +37,23 @@ impl<T> DerefMut for UnsafeSync<T> {
 mod tests {
     use super::*;
 
-    macro_rules! aw {
-        ($e:expr) => {
-            tokio_test::block_on($e)
-        };
-    }
+    #[tokio::test]
+    async fn test_channel_produce_and_consume() {
+        const CONSUMER_ID1: u128 = 0;
+        const CONSUMER_ID2: u128 = 1;
 
-    #[test]
-    fn test_channel_produce_and_consume() {
         let mut app = &mut crate::app::App {};
-        let mut channel = Channel::new(&mut app);
+        let channel = Channel::new(&mut app);
 
-        channel.produce(&mut vec![1, 2, 3, 4]);
-        assert_eq!(aw!(channel.consume(0, 4)), vec![1, 2, 3, 4]);
+        let mut producer = channel.producer();
+        let consumer1 = channel.consumer(CONSUMER_ID1);
+        let consumer2 = channel.consumer(CONSUMER_ID2);
 
-        assert_eq!(aw!(channel.consume(0, 4)), vec![]);
+        producer.produce(&mut vec![1, 2, 3, 4]).await;
+        assert_eq!(consumer1.consume().await, vec![1, 2, 3, 4]);
 
-        channel.produce(&mut vec![1, 2]);
-        assert_eq!(aw!(channel.consume(0, 4)), vec![1, 2]);
+        producer.produce(&mut vec![5, 6]).await;
+        assert_eq!(consumer1.consume().await, vec![5, 6]);
+        assert_eq!(consumer2.consume().await, vec![1, 2, 3, 4, 5, 6]);
     }
 }
