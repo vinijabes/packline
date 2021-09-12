@@ -1,6 +1,4 @@
 use crate::app::channel::Inner;
-use crate::internal::queue::iterator::AsyncIterator;
-use async_trait::async_trait;
 use std::convert::TryInto;
 
 pub(crate) trait ChannelStorage: Send + Sync {
@@ -11,22 +9,10 @@ pub(crate) trait ChannelStorage: Send + Sync {
     fn enqueue(&mut self, elements: &mut Vec<u32>);
     fn dequeue(&mut self, count: usize) -> Vec<u32>;
     fn peek(&self, offset: usize, count: usize) -> Vec<u32>;
-
-    fn iter(&self) -> Box<dyn AsyncIterator<Item = u32>>;
 }
 
 pub struct VecStorage {
     data: Vec<u32>,
-}
-
-pub struct Iter {}
-
-#[async_trait]
-impl AsyncIterator for Iter {
-    type Item = u32;
-    async fn next_count(&mut self, _count: usize) -> Vec<u32> {
-        vec![42u32]
-    }
 }
 
 impl ChannelStorage for VecStorage {
@@ -53,9 +39,5 @@ impl ChannelStorage for VecStorage {
         }
 
         self.data[offset..offset + count].try_into().unwrap()
-    }
-
-    fn iter(&self) -> Box<dyn AsyncIterator<Item = u32>> {
-        Box::new(Iter {})
     }
 }

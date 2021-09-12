@@ -3,13 +3,14 @@ name = "packline"
 version = "0.1.0"
 authors = ["Vinícius Jabes <vinijabes@gmail.com>"]
 edition = "2018"
+repository = "https://github.com/vinijabes/packline/"
 
 [dependencies]
 packline_flow = { path = "../packline_flow" }
 packline_cli = { path = "../packline_cli" }
-packline_core = { path = "../packline_core", features = ["full"]}
+packline_core = { path = "../packline_core", features = ["full"] }
 
-tokio = { version = "1.4.0", features = ["full"] }
+tokio = { version = "1.11.0", features = ["full"] }
 futures = "0.3.13"
 
 ctrlc = { version = "3.0", features = ["termination"] }
