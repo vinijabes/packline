@@ -23,7 +23,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         //TODO: detect program shutdown step and send oneshot signal.
         let (_tx, rx) = tokio::sync::oneshot::channel();
         let (client_tx, client_rx) = tokio::sync::oneshot::channel();
-        
+
         let mut connector = TCPConnector::new(Box::new(FlowConnector { app: &App {} }));
 
         let channel_test = Arc::new(Box::new(packline_core::app::channel::Channel::new(app)));

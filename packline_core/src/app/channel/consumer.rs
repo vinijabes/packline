@@ -197,7 +197,7 @@ impl<'a> Future for ConsumerFuture {
                         self.buffer.append(&mut result.unwrap_or(Vec::new()));
 
                         if self.timeout_future.is_elapsed() && !self.buffer.is_empty() {
-                            return Poll::Ready(std::mem::replace(&mut self.buffer, Vec::new()));
+                            return Poll::Ready(std::mem::take(&mut self.buffer));
                         }
                     }
                 } else {
@@ -222,7 +222,7 @@ impl<'a> Future for ConsumerFuture {
                 if self.buffer.is_empty() {
                     Poll::Pending
                 } else {
-                    Poll::Ready(std::mem::replace(&mut self.buffer, Vec::new()))
+                    Poll::Ready(std::mem::take(&mut self.buffer))
                 }
             }
         }
