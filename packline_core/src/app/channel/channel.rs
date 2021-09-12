@@ -32,7 +32,7 @@ unsafe impl Send for UnsafeSync<UnsafeCell<Inner>> {}
 unsafe impl Sync for UnsafeSync<UnsafeCell<Inner>> {}
 
 impl Channel {
-    pub fn new(app: &mut crate::app::App) -> Self {
+    pub fn new(app: crate::app::App) -> Self {
         let inner = Inner::new(app);
 
         Channel {
@@ -56,14 +56,14 @@ impl Channel {
 }
 
 impl Inner {
-    pub fn new(app: &mut crate::app::App) -> Self {
+    pub fn new(app: crate::app::App) -> Self {
         let mut inner = Inner {
             storage: None,
             consumer_strategy: None,
             consumer_group_handlers: RwLock::new(HashMap::new()),
         };
 
-        let storage = Rc::new(RefCell::new(VecStorage::new(app, &mut inner)));
+        let storage = Rc::new(RefCell::new(VecStorage::new(app.clone(), &mut inner)));
         inner.storage = Some(storage);
 
         let consumer_strategy = Rc::new(RefCell::new(BaseConsumerStrategy::new(app, &mut inner)));

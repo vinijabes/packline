@@ -2,7 +2,7 @@ use crate::app::channel::Inner;
 use std::convert::TryInto;
 
 pub(crate) trait ChannelStorage: Send + Sync {
-    fn new(app: &mut crate::app::App, channel: &mut Inner) -> Self
+    fn new(app: crate::app::App, channel: &mut Inner) -> Self
     where
         Self: Sized;
 
@@ -16,7 +16,7 @@ pub struct VecStorage {
 }
 
 impl ChannelStorage for VecStorage {
-    fn new(_app: &mut crate::app::App, _channel: &mut Inner) -> Self {
+    fn new(_app: crate::app::App, _channel: &mut Inner) -> Self {
         VecStorage { data: Vec::new() }
     }
 

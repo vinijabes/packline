@@ -17,8 +17,8 @@ use packline_core::connector::{TCPConnectionHandler, TCPConnectorHandler};
 use crate::codec::FlowCodec;
 use crate::messages::Packet;
 
-pub struct FlowConnector<'a> {
-    pub app: &'a App,
+pub struct FlowConnector {
+    pub app: App,
 }
 
 #[cfg_attr(debug_assertions, derive(Debug))]
@@ -28,7 +28,7 @@ pub struct FlowConnectionHandler {
 }
 
 #[async_trait]
-impl<'a> TCPConnectorHandler for FlowConnector<'a> {
+impl TCPConnectorHandler for FlowConnector {
     fn handle_connection(&self, conn: (TcpStream, SocketAddr)) -> Box<dyn TCPConnectionHandler> {
         Box::new(FlowConnectionHandler {
             addr: conn.1,
