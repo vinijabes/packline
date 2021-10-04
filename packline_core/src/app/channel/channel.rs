@@ -14,6 +14,7 @@ use super::consumer::ConsumerStrategy;
 use super::storage::ChannelStorage;
 use crate::app::channel::producer::Producer;
 
+#[derive(Clone)]
 pub struct Channel {
     inner: Arc<UnsafeSync<UnsafeCell<Inner>>>,
 }
