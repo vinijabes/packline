@@ -42,8 +42,8 @@ mod tests {
         const CONSUMER_ID1: u128 = 0;
         const CONSUMER_ID2: u128 = 1;
 
-        let mut app = &mut crate::app::App {};
-        let channel = Channel::new(&mut app);
+        let app = &mut crate::app::App::new();
+        let channel = Channel::new(app.clone());
 
         let mut producer = channel.producer();
         let consumer1 = channel.consumer(CONSUMER_ID1);

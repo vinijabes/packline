@@ -5,19 +5,20 @@ authors = ["Vinícius Jabes <vinijabes@gmail.com>"]
 edition = "2018"
 repository = "https://github.com/vinijabes/packline/"
 
+[lib]
+name = "packline_core"
+
 [dev-dependencies]
 tokio-test = "0.4.0"
 
 [dependencies]
-tokio = { version = "1.11.0", features = ["process", "net"] }
+tokio = { version = "1.11.0", features = ["process", "net", "macros"] }
 async-trait = { version = "0.1.48" }
 futures = "0.3.13"
 tracing = "0.1"
 
 [features]
 default = []
-
 full = ["broker", "connector"]
-
 broker = []
 connector = ["broker"]

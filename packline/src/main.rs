@@ -6,7 +6,6 @@ use tokio::time::Duration;
 use tracing::{debug, info};
 
 use packline_cli::client::connect;
-use packline_core::app::App;
 use packline_core::connector::{Connector, TCPConnector};
 use packline_flow::connector::FlowConnector;
 
@@ -18,15 +17,15 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
 
     info!("Starting Packline");
     let _ = tokio::spawn(async {
-        let app = &mut packline_core::app::App {};
+        let mut app = packline_core::app::App::new();
 
         //TODO: detect program shutdown step and send oneshot signal.
         let (_tx, rx) = tokio::sync::oneshot::channel();
         let (client_tx, client_rx) = tokio::sync::oneshot::channel();
 
-        let mut connector = TCPConnector::new(Box::new(FlowConnector { app: &App {} }));
+        let mut connector = TCPConnector::new(Box::new(FlowConnector { app: app.clone() }));
 
-        let channel_test = Arc::new(Box::new(packline_core::app::channel::Channel::new(app)));
+        let channel_test = Arc::new(Box::new(packline_core::app::channel::Channel::new(app.clone())));
         let consumer = channel_test.consumer(0);
         let mut producer = channel_test.producer();
 
@@ -57,7 +56,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
         });
 
         let _ = connector
-            .run(app, tokio::runtime::Handle::current(), &mut rx.fuse())
+            .run(&mut app, tokio::runtime::Handle::current(), &mut rx.fuse())
             .await;
 
         let _ = client_tx.send(true);

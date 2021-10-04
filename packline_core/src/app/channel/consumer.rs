@@ -18,7 +18,7 @@ use super::channel::ConsumerGroupHandler;
 use super::storage::ChannelStorage;
 
 pub(crate) trait ConsumerStrategy: Send + Sync {
-    fn new(app: &mut crate::app::App, channel: &mut Inner) -> Self
+    fn new(app: crate::app::App, channel: &mut Inner) -> Self
     where
         Self: Sized;
 
@@ -35,7 +35,7 @@ unsafe impl Send for BaseConsumerStrategy {}
 unsafe impl Sync for BaseConsumerStrategy {}
 
 impl ConsumerStrategy for BaseConsumerStrategy {
-    fn new(_: &mut crate::app::App, channel: &mut Inner) -> Self {
+    fn new(_: crate::app::App, channel: &mut Inner) -> Self {
         BaseConsumerStrategy {
             storage: channel.storage.as_ref().unwrap().clone(),
         }
