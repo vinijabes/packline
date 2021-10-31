@@ -2,7 +2,7 @@
 name = "packline_flow"
 version = "0.1.0"
 authors = ["Vinícius Jabes <vinijabes@gmail.com>"]
-edition = "2018"
+edition = "2021"
 repository = "https://github.com/vinijabes/packline/"
 
 [lib]
@@ -12,7 +12,6 @@ name = "packline_flow"
 flow_derive = { path = "libs/flow_derive" }
 packline_core = { path = "../packline_core", features = ["connector"] }
 async-trait = { version = "0.1.48" }
-
 tokio = { version = "1.11.0", features = ["process"] }
 tokio-util = { version = "0.6.8", features = ["codec"] }
 tokio-sync = "0.1.8"

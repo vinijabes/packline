@@ -2,13 +2,12 @@
 name = "packline_cli"
 version = "0.1.0"
 authors = ["Vinícius Jabes <vinijabes@gmail.com>"]
-edition = "2018"
+edition = "2021"
 repository = "https://github.com/vinijabes/packline/"
 
 [dependencies]
 packline_flow = { path = "../packline_flow" }
 log = "0.4"
-
 tokio = { version = "1.11.0", features = ["process"] }
 tokio-util = { version = "0.6.8", features = ["codec"] }
 futures = "0.3.13"
