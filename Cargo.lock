@@ -387,6 +387,7 @@ dependencies = [
  "packline_cli",
  "packline_core",
  "packline_flow",
+ "rand",
  "tokio",
  "tracing",
  "tracing-subscriber",

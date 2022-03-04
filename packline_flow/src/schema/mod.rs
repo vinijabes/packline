@@ -143,6 +143,32 @@ impl SizedSchema for i64 {
     }
 }
 
+impl SerializableSchema for u8 {
+    fn serialize(&self, encoder: &mut BytesMut) {
+        encoder.put_u8(*self);
+    }
+
+    type Error = std::convert::Infallible;
+}
+
+impl DeserializableSchema for u8 {
+    #[inline(always)]
+    fn deserialize(decoder: &mut crate::codec::decoder::ByteDecoder) -> Result<u8, std::convert::Infallible> {
+        Ok(u8::from_be_bytes(
+            decoder.next(1).try_into().expect("slice with incorrect length"),
+        ))
+    }
+
+    type Item = u8;
+    type Error = std::convert::Infallible;
+}
+
+impl SizedSchema for u8 {
+    fn size(&self) -> usize {
+        std::mem::size_of::<u8>()
+    }
+}
+
 impl SerializableSchema for u16 {
     fn serialize(&self, encoder: &mut BytesMut) {
         encoder.put_u16(*self);
@@ -299,13 +325,13 @@ impl DeserializableSchema for String {
 
 impl SizedSchema for String {
     fn size(&self) -> usize {
-        std::mem::size_of::<char>() * self.chars().count()
+        std::mem::size_of::<i64>() + self.len()
     }
 }
 
 impl<T: SerializableSchema> SerializableSchema for Vec<T> {
     fn serialize(&self, encoder: &mut BytesMut) {
-        (self.size() as i64).serialize(encoder);
+        (self.len() as i64).serialize(encoder);
         for i in self {
             i.serialize(encoder);
         }
@@ -331,8 +357,11 @@ impl<T: DeserializableSchema<Item = T, Error = std::convert::Infallible>> Deseri
     type Error = std::convert::Infallible;
 }
 
-impl<T: SizedSchema> SizedSchema for Vec<T> {
+impl<T: SizedSchema> SizedSchema for Vec<T>
+where
+    T: SizedSchema,
+{
     fn size(&self) -> usize {
-        self.iter().map(SizedSchema::size).sum()
+        self.iter().map(SizedSchema::size).sum::<usize>() + std::mem::size_of::<i64>()
     }
 }

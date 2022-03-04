@@ -29,8 +29,8 @@ pub(crate) struct Inner {
 unsafe impl Send for Inner {}
 unsafe impl Sync for Inner {}
 
-unsafe impl Send for UnsafeSync<UnsafeCell<Inner>> {}
-unsafe impl Sync for UnsafeSync<UnsafeCell<Inner>> {}
+unsafe impl<T> Send for UnsafeSync<T> {}
+unsafe impl<T> Sync for UnsafeSync<T> {}
 
 impl Channel {
     pub fn new(app: crate::app::App) -> Self {

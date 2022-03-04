@@ -19,10 +19,8 @@ struct Inner {
 }
 
 pub struct ChannelConfig {
-    #[allow(dead_code)]
-    name: String,
-    #[allow(dead_code)]
-    partitions: u16,
+    pub name: String,
+    pub partitions: u16,
 }
 
 pub struct ChannelPartitionMetadata {}

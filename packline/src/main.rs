@@ -1,13 +1,16 @@
 use std::error::Error;
-use std::sync::Arc;
 
 use futures::FutureExt;
 use tokio::time::Duration;
 use tracing::{debug, info};
 
 use packline_cli::client::connect;
-use packline_core::connector::{Connector, TCPConnector};
+use packline_core::{
+    app::ChannelConfig,
+    connector::{Connector, TCPConnector},
+};
 use packline_flow::connector::FlowConnector;
+use rand::{rngs::StdRng, Rng, SeedableRng};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
@@ -25,9 +28,15 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
 
         let mut connector = TCPConnector::new(Box::new(FlowConnector { app: app.clone() }));
 
-        let channel_test = Arc::new(Box::new(packline_core::app::channel::Channel::new(app.clone())));
-        let consumer = channel_test.consumer(0);
-        let mut producer = channel_test.producer();
+        let _ = app
+            .create_channel(ChannelConfig {
+                name: "testing_topic".to_string(),
+                partitions: 1,
+            })
+            .await;
+
+        let channel = app.get_channel(&("testing_topic".to_string(), 1)).await.unwrap();
+        let mut producer = channel.producer();
 
         tokio::spawn(async move {
             let mut data = vec![0u32];
@@ -37,18 +46,24 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
 
             let mut data = vec![10u32];
             producer.produce(&mut data).await;
-        });
 
-        let result = consumer.consume().await;
-        println!("{:?}", result);
-        //consumer_test.consume().await;
+            let mut interval = tokio::time::interval(Duration::from_millis(10));
+
+            let mut rng = StdRng::from_entropy();
+            loop {
+                interval.tick().await;
+
+                let value: u32 = rng.gen_range(0u32..100u32);
+                producer.produce(&mut vec![value]).await;
+            }
+        });
 
         tokio::spawn(async move {
             let mut client = connect("127.0.0.1:1883").await.unwrap();
 
             client
-                .consume("testing_topic".to_string(), || {
-                    debug!("Handling packets");
+                .consume("testing_topic".to_string(), |record| {
+                    debug!("Handling packets {}", record);
                 })
                 .await;
 

@@ -87,9 +87,10 @@ impl ConsumerWaker {
 
     fn remove(&self, handle: *const ConsumerWakerHandle) {
         let mut guard = self.wakers.lock().unwrap();
-        let pos = guard.iter().position(|x| std::ptr::eq(x.as_ptr(), handle)).unwrap();
-
-        guard.remove(pos);
+        guard
+            .iter()
+            .position(|h| std::ptr::eq(h.as_ptr(), handle))
+            .map(|pos| guard.remove(pos));
     }
 
     pub fn wake(&self) {
