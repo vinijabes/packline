@@ -15,22 +15,25 @@ use packline_core::app::App;
 use packline_core::connector::{TCPConnectionHandler, TCPConnectorHandler};
 
 use crate::codec::FlowCodec;
+use crate::messages::consume::ConsumeV1;
+use crate::messages::Message;
 use crate::messages::Packet;
 
-pub struct FlowConnector<'a> {
-    pub app: &'a App,
+pub struct FlowConnector {
+    pub app: App,
 }
 
-#[cfg_attr(debug_assertions, derive(Debug))]
 pub struct FlowConnectionHandler {
+    app: App,
     addr: SocketAddr,
     stream: Option<TcpStream>,
 }
 
 #[async_trait]
-impl<'a> TCPConnectorHandler for FlowConnector<'a> {
+impl TCPConnectorHandler for FlowConnector {
     fn handle_connection(&self, conn: (TcpStream, SocketAddr)) -> Box<dyn TCPConnectionHandler> {
         Box::new(FlowConnectionHandler {
+            app: self.app.clone(),
             addr: conn.1,
             stream: Some(conn.0),
         })
@@ -44,7 +47,6 @@ struct ConnectionState {
 
 #[async_trait]
 impl TCPConnectionHandler for FlowConnectionHandler {
-    #[cfg_attr(debug_assertions, tracing::instrument)]
     async fn handle(&mut self) -> Result<(), std::io::Error> {
         let handle = Handle::current();
         debug!("New Flow Connection: {}", self.addr);
@@ -60,19 +62,18 @@ impl TCPConnectionHandler for FlowConnectionHandler {
 
         loop {
             let packet = stream.next().await;
+            debug!(?packet);
             match packet {
                 None => break,
                 Some(r) => {
                     let state = rc_state.clone();
-                    handle.spawn(async move {
-                        let packet = FlowConnectionHandler::handle_packet(state.clone(), r.unwrap()).unwrap();
-                        {
-                            let mut sink = state.sink.lock().await;
-                            let result = sink.send(packet).await;
+                    let packet = self.handle_packet(state.clone(), r.unwrap()).unwrap();
+                    if let Some(packet) = packet {
+                        let mut sink = state.sink.lock().await;
+                        let result = sink.send(packet).await;
 
-                            debug!("Wrote to stream; success={:?}", result.is_ok());
-                        }
-                    });
+                        debug!("Wrote to stream; success={:?}", result.is_ok());
+                    }
                 }
             }
         }
@@ -83,14 +84,53 @@ impl TCPConnectionHandler for FlowConnectionHandler {
 }
 
 impl FlowConnectionHandler {
-    #[cfg_attr(debug_assertions, tracing::instrument)]
-    fn handle_packet(state: Arc<ConnectionState>, packet: Packet) -> Result<Packet, std::io::Error> {
-        use super::messages::Message;
-
-        info!("handling packet");
+    fn handle_packet(&self, state: Arc<ConnectionState>, packet: Packet) -> Result<Option<Packet>, std::io::Error> {
+        info!("handling packet {:?}", &packet.message);
         match &packet.message {
-            Message::SubscribeTopicRequestV1(_) => Ok(packet),
-            _ => Ok(packet),
+            Message::SubscribeTopicRequestV1(subscribe) => {
+                self.handle_subscribe_topic_request(state, packet.context_id, subscribe.clone());
+                Ok(None)
+            }
+            _ => Ok(Some(packet)),
         }
+    }
+
+    fn handle_subscribe_topic_request(
+        &self,
+        state: Arc<ConnectionState>,
+        context_id: u32,
+        subscribe: super::messages::subscribe::SubscribeTopicRequestV1,
+    ) {
+        let handle = Handle::current();
+
+        let app = self.app.clone();
+        handle.spawn(async move {
+            let topic = subscribe.topic.to_string();
+            let channel = app.get_channel(&(topic.clone(), 1u16)).await;
+
+            if let Some(channel) = channel {
+                info!("Starting consuming from channel {:?}", &topic);
+                let consumer = channel.consumer(0);
+
+                loop {
+                    let records = consumer.consume().await;
+
+                    {
+                        let mut guard = state.sink.lock().await;
+
+                        let packet = Packet::new_stream_packet(
+                            context_id,
+                            (3, 1),
+                            Message::ConsumeV1(ConsumeV1 {
+                                topic: topic.clone(),
+                                records,
+                            }),
+                        );
+
+                        let _ = guard.send(packet).await;
+                    }
+                }
+            }
+        });
     }
 }

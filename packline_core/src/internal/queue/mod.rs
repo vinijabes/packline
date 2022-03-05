@@ -1,5 +1,3 @@
-pub mod iterator;
-
 #[allow(dead_code)]
 pub struct Queue<T> {
     head: Link<T>,

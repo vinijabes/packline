@@ -18,7 +18,7 @@ use super::channel::ConsumerGroupHandler;
 use super::storage::ChannelStorage;
 
 pub(crate) trait ConsumerStrategy: Send + Sync {
-    fn new(app: &mut crate::app::App, channel: &mut Inner) -> Self
+    fn new(app: crate::app::App, channel: &mut Inner) -> Self
     where
         Self: Sized;
 
@@ -35,7 +35,7 @@ unsafe impl Send for BaseConsumerStrategy {}
 unsafe impl Sync for BaseConsumerStrategy {}
 
 impl ConsumerStrategy for BaseConsumerStrategy {
-    fn new(_: &mut crate::app::App, channel: &mut Inner) -> Self {
+    fn new(_: crate::app::App, channel: &mut Inner) -> Self {
         BaseConsumerStrategy {
             storage: channel.storage.as_ref().unwrap().clone(),
         }
@@ -87,9 +87,10 @@ impl ConsumerWaker {
 
     fn remove(&self, handle: *const ConsumerWakerHandle) {
         let mut guard = self.wakers.lock().unwrap();
-        let pos = guard.iter().position(|x| std::ptr::eq(x.as_ptr(), handle)).unwrap();
-
-        guard.remove(pos);
+        guard
+            .iter()
+            .position(|h| std::ptr::eq(h.as_ptr(), handle))
+            .map(|pos| guard.remove(pos));
     }
 
     pub fn wake(&self) {
@@ -197,7 +198,7 @@ impl<'a> Future for ConsumerFuture {
                         self.buffer.append(&mut result.unwrap_or(Vec::new()));
 
                         if self.timeout_future.is_elapsed() && !self.buffer.is_empty() {
-                            return Poll::Ready(std::mem::replace(&mut self.buffer, Vec::new()));
+                            return Poll::Ready(std::mem::take(&mut self.buffer));
                         }
                     }
                 } else {
@@ -222,7 +223,7 @@ impl<'a> Future for ConsumerFuture {
                 if self.buffer.is_empty() {
                     Poll::Pending
                 } else {
-                    Poll::Ready(std::mem::replace(&mut self.buffer, Vec::new()))
+                    Poll::Ready(std::mem::take(&mut self.buffer))
                 }
             }
         }
