@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::collections::LinkedList;
 use std::future::Future;
 use std::pin::Pin;
@@ -22,12 +21,12 @@ pub(crate) trait ConsumerStrategy: Send + Sync {
     where
         Self: Sized;
 
-    fn produce(&mut self, data: &mut Vec<u32>);
+    fn produce(&self, data: &mut Vec<u32>);
     fn consume(&self, offset: usize, count: usize) -> Option<Vec<u32>>;
 }
 
 pub struct BaseConsumerStrategy {
-    storage: Rc<RefCell<dyn ChannelStorage>>,
+    storage: Rc<dyn ChannelStorage>,
 }
 
 unsafe impl Send for BaseConsumerStrategy {}
@@ -41,12 +40,12 @@ impl ConsumerStrategy for BaseConsumerStrategy {
         }
     }
 
-    fn produce(&mut self, data: &mut Vec<u32>) {
-        self.storage.borrow_mut().enqueue(data);
+    fn produce(&self, data: &mut Vec<u32>) {
+        self.storage.enqueue(data);
     }
 
     fn consume(&self, offset: usize, count: usize) -> Option<Vec<u32>> {
-        let result = self.storage.borrow().peek(offset, count);
+        let result = self.storage.peek(offset, count);
 
         if result.is_empty() {
             None
