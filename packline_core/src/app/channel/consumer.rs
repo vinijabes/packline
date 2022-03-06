@@ -1,8 +1,8 @@
+use spin::Mutex;
 use std::collections::LinkedList;
 use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
-use std::sync::Mutex;
 use std::sync::{Arc, Weak};
 use std::task::{Context, Poll, Waker};
 
@@ -78,14 +78,14 @@ impl ConsumerWaker {
             inner: AtomicWaker::new(),
         });
 
-        let mut guard = self.wakers.lock().unwrap();
+        let mut guard = self.wakers.lock();
         guard.push_back(Arc::downgrade(&handle.clone()));
 
         handle
     }
 
     fn remove(&self, handle: *const ConsumerWakerHandle) {
-        let mut guard = self.wakers.lock().unwrap();
+        let mut guard = self.wakers.lock();
         guard
             .iter()
             .position(|h| std::ptr::eq(h.as_ptr(), handle))
@@ -93,11 +93,14 @@ impl ConsumerWaker {
     }
 
     pub fn wake(&self) {
-        let mut guard = self.wakers.lock().unwrap();
-        if let Some(weak) = guard.pop_front() {
+        let mut guard = self.wakers.lock();
+        while let Some(weak) = guard.pop_front() {
             if let Some(waker) = weak.upgrade() {
                 waker.wake();
                 guard.push_back(weak);
+
+                drop(guard);
+                return;
             }
         }
     }
