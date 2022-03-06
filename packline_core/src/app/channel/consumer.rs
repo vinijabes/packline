@@ -2,7 +2,6 @@ use spin::Mutex;
 use std::collections::LinkedList;
 use std::future::Future;
 use std::pin::Pin;
-use std::rc::Rc;
 use std::sync::{Arc, Weak};
 use std::task::{Context, Poll, Waker};
 
@@ -26,12 +25,8 @@ pub(crate) trait ConsumerStrategy: Send + Sync {
 }
 
 pub struct BaseConsumerStrategy {
-    storage: Rc<dyn ChannelStorage>,
+    storage: Arc<dyn ChannelStorage>,
 }
-
-unsafe impl Send for BaseConsumerStrategy {}
-
-unsafe impl Sync for BaseConsumerStrategy {}
 
 impl ConsumerStrategy for BaseConsumerStrategy {
     fn new(_: crate::app::App, channel: &mut Inner) -> Self {
@@ -133,8 +128,6 @@ pub struct Consumer {
     handler: Arc<ConsumerGroupHandler>,
 }
 
-unsafe impl Send for Consumer {}
-
 struct ConsumerConfigs {
     timeout: u64,
 }
@@ -169,7 +162,6 @@ pub struct ConsumerFuture {
 }
 
 unsafe impl Send for ConsumerFuture {}
-
 unsafe impl Sync for ConsumerFuture {}
 
 impl<'a> ConsumerFuture {

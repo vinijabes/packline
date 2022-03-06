@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -18,14 +17,11 @@ pub struct Channel {
 }
 
 pub(crate) struct Inner {
-    pub storage: Option<Rc<dyn ChannelStorage>>,
-    pub consumer_strategy: Option<Rc<dyn ConsumerStrategy>>,
+    pub storage: Option<Arc<dyn ChannelStorage>>,
+    pub consumer_strategy: Option<Arc<dyn ConsumerStrategy>>,
 
     pub consumer_group_handlers: RwLock<HashMap<u128, Arc<ConsumerGroupHandler>>>,
 }
-
-unsafe impl Send for Inner {}
-unsafe impl Sync for Inner {}
 
 impl Channel {
     pub fn new(app: crate::app::App) -> Self {
@@ -54,10 +50,10 @@ impl Inner {
             consumer_group_handlers: RwLock::new(HashMap::new()),
         };
 
-        let storage = Rc::new(VecStorage::new(app.clone(), &mut inner));
+        let storage = Arc::new(VecStorage::new(app.clone(), &mut inner));
         inner.storage = Some(storage);
 
-        let consumer_strategy = Rc::new(BaseConsumerStrategy::new(app, &mut inner));
+        let consumer_strategy = Arc::new(BaseConsumerStrategy::new(app, &mut inner));
         inner.consumer_strategy = Some(consumer_strategy);
 
         inner
@@ -103,13 +99,10 @@ impl Inner {
 
 pub(crate) struct ConsumerGroupHandler {
     offset: AtomicUsize,
-    consumer_strategy: Rc<dyn ConsumerStrategy>,
+    consumer_strategy: Arc<dyn ConsumerStrategy>,
 
     waker: Arc<ConsumerWaker>,
 }
-
-unsafe impl Send for ConsumerGroupHandler {}
-unsafe impl Sync for ConsumerGroupHandler {}
 
 impl ConsumerGroupHandler {
     pub fn waker(&self) -> Arc<ConsumerWaker> {
