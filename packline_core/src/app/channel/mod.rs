@@ -1,5 +1,3 @@
-use std::ops::{Deref, DerefMut};
-
 pub use channel::Channel;
 pub(crate) use channel::Inner;
 
@@ -8,30 +6,6 @@ mod channel;
 pub mod consumer;
 pub mod producer;
 pub mod storage;
-
-pub struct UnsafeSync<T> {
-    inner: T,
-}
-
-impl<T> UnsafeSync<T> {
-    fn new(value: T) -> Self {
-        UnsafeSync { inner: value }
-    }
-}
-
-impl<T> Deref for UnsafeSync<T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl<T> DerefMut for UnsafeSync<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
-    }
-}
 
 #[cfg(test)]
 mod tests {
