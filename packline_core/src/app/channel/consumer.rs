@@ -1,9 +1,7 @@
-use std::cell::RefCell;
+use spin::Mutex;
 use std::collections::LinkedList;
 use std::future::Future;
 use std::pin::Pin;
-use std::rc::Rc;
-use std::sync::Mutex;
 use std::sync::{Arc, Weak};
 use std::task::{Context, Poll, Waker};
 
@@ -22,17 +20,13 @@ pub(crate) trait ConsumerStrategy: Send + Sync {
     where
         Self: Sized;
 
-    fn produce(&mut self, data: &mut Vec<u32>);
+    fn produce(&self, data: &mut Vec<u32>);
     fn consume(&self, offset: usize, count: usize) -> Option<Vec<u32>>;
 }
 
 pub struct BaseConsumerStrategy {
-    storage: Rc<RefCell<dyn ChannelStorage>>,
+    storage: Arc<dyn ChannelStorage>,
 }
-
-unsafe impl Send for BaseConsumerStrategy {}
-
-unsafe impl Sync for BaseConsumerStrategy {}
 
 impl ConsumerStrategy for BaseConsumerStrategy {
     fn new(_: crate::app::App, channel: &mut Inner) -> Self {
@@ -41,12 +35,12 @@ impl ConsumerStrategy for BaseConsumerStrategy {
         }
     }
 
-    fn produce(&mut self, data: &mut Vec<u32>) {
-        self.storage.borrow_mut().enqueue(data);
+    fn produce(&self, data: &mut Vec<u32>) {
+        self.storage.enqueue(data);
     }
 
     fn consume(&self, offset: usize, count: usize) -> Option<Vec<u32>> {
-        let result = self.storage.borrow().peek(offset, count);
+        let result = self.storage.peek(offset, count);
 
         if result.is_empty() {
             None
@@ -79,14 +73,14 @@ impl ConsumerWaker {
             inner: AtomicWaker::new(),
         });
 
-        let mut guard = self.wakers.lock().unwrap();
+        let mut guard = self.wakers.lock();
         guard.push_back(Arc::downgrade(&handle.clone()));
 
         handle
     }
 
     fn remove(&self, handle: *const ConsumerWakerHandle) {
-        let mut guard = self.wakers.lock().unwrap();
+        let mut guard = self.wakers.lock();
         guard
             .iter()
             .position(|h| std::ptr::eq(h.as_ptr(), handle))
@@ -94,11 +88,14 @@ impl ConsumerWaker {
     }
 
     pub fn wake(&self) {
-        let mut guard = self.wakers.lock().unwrap();
-        if let Some(weak) = guard.pop_front() {
+        let mut guard = self.wakers.lock();
+        while let Some(weak) = guard.pop_front() {
             if let Some(waker) = weak.upgrade() {
                 waker.wake();
                 guard.push_back(weak);
+
+                drop(guard);
+                return;
             }
         }
     }
@@ -130,8 +127,6 @@ pub struct Consumer {
     configs: ConsumerConfigs,
     handler: Arc<ConsumerGroupHandler>,
 }
-
-unsafe impl Send for Consumer {}
 
 struct ConsumerConfigs {
     timeout: u64,
@@ -167,7 +162,6 @@ pub struct ConsumerFuture {
 }
 
 unsafe impl Send for ConsumerFuture {}
-
 unsafe impl Sync for ConsumerFuture {}
 
 impl<'a> ConsumerFuture {

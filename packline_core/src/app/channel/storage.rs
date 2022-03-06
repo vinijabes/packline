@@ -1,4 +1,5 @@
 use crate::app::channel::Inner;
+use spin::Mutex;
 use std::convert::TryInto;
 
 pub(crate) trait ChannelStorage: Send + Sync {
@@ -6,38 +7,43 @@ pub(crate) trait ChannelStorage: Send + Sync {
     where
         Self: Sized;
 
-    fn enqueue(&mut self, elements: &mut Vec<u32>);
-    fn dequeue(&mut self, count: usize) -> Vec<u32>;
+    fn enqueue(&self, elements: &mut Vec<u32>);
+    fn dequeue(&self, count: usize) -> Vec<u32>;
     fn peek(&self, offset: usize, count: usize) -> Vec<u32>;
 }
 
 pub struct VecStorage {
-    data: Vec<u32>,
+    data: Mutex<Vec<u32>>,
 }
 
 impl ChannelStorage for VecStorage {
     fn new(_app: crate::app::App, _channel: &mut Inner) -> Self {
-        VecStorage { data: Vec::new() }
+        VecStorage {
+            data: Mutex::new(Vec::new()),
+        }
     }
 
-    fn enqueue(&mut self, elements: &mut Vec<u32>) {
-        self.data.append(elements);
+    fn enqueue(&self, elements: &mut Vec<u32>) {
+        let mut guard = self.data.lock();
+        guard.append(elements);
     }
 
-    fn dequeue(&mut self, _count: usize) -> Vec<u32> {
+    fn dequeue(&self, _count: usize) -> Vec<u32> {
         Vec::new()
     }
 
     fn peek(&self, offset: usize, count: usize) -> Vec<u32> {
-        if offset > self.data.len() {
+        let guard = self.data.lock();
+
+        if offset > guard.len() {
             return vec![];
         }
 
         let mut count = count;
-        if offset + count > self.data.len() {
-            count = self.data.len() - offset;
+        if offset + count > guard.len() {
+            count = guard.len() - offset;
         }
 
-        self.data[offset..offset + count].try_into().unwrap()
+        guard[offset..offset + count].try_into().unwrap()
     }
 }

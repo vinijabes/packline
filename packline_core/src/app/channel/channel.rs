@@ -1,6 +1,4 @@
-use std::cell::{RefCell, UnsafeCell};
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -8,7 +6,6 @@ use tokio::sync::RwLock;
 
 use crate::app::channel::consumer::{BaseConsumerStrategy, Consumer, ConsumerWaker};
 use crate::app::channel::storage::VecStorage;
-use crate::app::channel::UnsafeSync;
 
 use super::consumer::ConsumerStrategy;
 use super::storage::ChannelStorage;
@@ -16,39 +13,28 @@ use crate::app::channel::producer::Producer;
 
 #[derive(Clone)]
 pub struct Channel {
-    inner: Arc<UnsafeSync<UnsafeCell<Inner>>>,
+    inner: Arc<Inner>,
 }
 
 pub(crate) struct Inner {
-    pub storage: Option<Rc<RefCell<dyn ChannelStorage>>>,
-    pub consumer_strategy: Option<Rc<RefCell<dyn ConsumerStrategy>>>,
+    pub storage: Option<Arc<dyn ChannelStorage>>,
+    pub consumer_strategy: Option<Arc<dyn ConsumerStrategy>>,
 
     pub consumer_group_handlers: RwLock<HashMap<u128, Arc<ConsumerGroupHandler>>>,
 }
-
-unsafe impl Send for Inner {}
-unsafe impl Sync for Inner {}
-
-unsafe impl<T> Send for UnsafeSync<T> {}
-unsafe impl<T> Sync for UnsafeSync<T> {}
 
 impl Channel {
     pub fn new(app: crate::app::App) -> Self {
         let inner = Inner::new(app);
 
-        Channel {
-            inner: Arc::new(UnsafeSync::new(UnsafeCell::new(inner))),
-        }
+        Channel { inner: Arc::new(inner) }
     }
 
     pub fn consumer(&self, consumer_id: u128) -> Consumer {
-        unsafe {
-            let pointer: &mut Inner = &mut *self.inner.get();
-            Consumer::new(
-                consumer_id,
-                futures::executor::block_on(pointer.consumer_group_handler(consumer_id)),
-            )
-        }
+        Consumer::new(
+            consumer_id,
+            futures::executor::block_on(self.inner.consumer_group_handler(consumer_id)),
+        )
     }
 
     pub fn producer(&self) -> Producer {
@@ -64,17 +50,17 @@ impl Inner {
             consumer_group_handlers: RwLock::new(HashMap::new()),
         };
 
-        let storage = Rc::new(RefCell::new(VecStorage::new(app.clone(), &mut inner)));
+        let storage = Arc::new(VecStorage::new(app.clone(), &mut inner));
         inner.storage = Some(storage);
 
-        let consumer_strategy = Rc::new(RefCell::new(BaseConsumerStrategy::new(app, &mut inner)));
+        let consumer_strategy = Arc::new(BaseConsumerStrategy::new(app, &mut inner));
         inner.consumer_strategy = Some(consumer_strategy);
 
         inner
     }
 
-    pub fn produce(&mut self, data: &mut Vec<u32>) {
-        self.consumer_strategy.as_ref().unwrap().borrow_mut().produce(data);
+    pub fn produce(&self, data: &mut Vec<u32>) {
+        self.consumer_strategy.as_ref().unwrap().produce(data);
 
         let guard = futures::executor::block_on(self.consumer_group_handlers.read());
         for (_, consumer_group_handler) in guard.iter() {
@@ -83,8 +69,8 @@ impl Inner {
     }
 
     #[allow(dead_code)]
-    pub async fn consume(&mut self, offset: usize, count: usize) -> Option<Vec<u32>> {
-        let result = self.consumer_strategy.as_ref().unwrap().borrow().consume(offset, count);
+    pub async fn consume(&self, offset: usize, count: usize) -> Option<Vec<u32>> {
+        let result = self.consumer_strategy.as_ref().unwrap().consume(offset, count);
 
         result
     }
@@ -113,13 +99,10 @@ impl Inner {
 
 pub(crate) struct ConsumerGroupHandler {
     offset: AtomicUsize,
-    consumer_strategy: Rc<RefCell<dyn ConsumerStrategy>>,
+    consumer_strategy: Arc<dyn ConsumerStrategy>,
 
     waker: Arc<ConsumerWaker>,
 }
-
-unsafe impl Send for ConsumerGroupHandler {}
-unsafe impl Sync for ConsumerGroupHandler {}
 
 impl ConsumerGroupHandler {
     pub fn waker(&self) -> Arc<ConsumerWaker> {
@@ -129,7 +112,7 @@ impl ConsumerGroupHandler {
     pub async fn consume(&self, count: usize) -> Option<Vec<u32>> {
         let current_offset = self.offset.load(Ordering::Relaxed);
 
-        let result = self.consumer_strategy.borrow().consume(current_offset, count);
+        let result = self.consumer_strategy.consume(current_offset, count);
         if let Some(data) = &result {
             self.offset.store(current_offset + data.len(), Ordering::Relaxed);
         }
