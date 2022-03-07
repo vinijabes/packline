@@ -11,12 +11,11 @@ name = "packline_flow"
 [dependencies]
 flow_derive = { path = "libs/flow_derive" }
 packline_core = { path = "../packline_core", features = ["connector"] }
-async-trait = { version = "0.1.48" }
-tokio = { version = "1.11.0", features = ["process"] }
-tokio-util = { version = "0.6.8", features = ["codec"] }
-tokio-sync = "0.1.8"
+async-trait = { version = "0.1.52" }
+tokio = { version = "1.17.0", features = ["process", "sync"] }
+tokio-util = { version = "0.7.0", features = ["codec"] }
 bytes = "1.0.0"
-futures = "0.3.13"
+futures = "0.3.21"
 rand = "0.8.0"
 tracing = "0.1"
 tracing-subscriber = "0.3.9"
