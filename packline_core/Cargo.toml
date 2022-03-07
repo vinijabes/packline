@@ -9,12 +9,12 @@ repository = "https://github.com/vinijabes/packline/"
 name = "packline_core"
 
 [dev-dependencies]
-tokio-test = "0.4.0"
+tokio-test = "0.4.2"
 
 [dependencies]
-tokio = { version = "1.11.0", features = ["process", "net", "macros"] }
-async-trait = { version = "0.1.48" }
-futures = "0.3.13"
+tokio = { version = "1.17.0", features = ["process", "net", "macros"] }
+async-trait = { version = "0.1.52" }
+futures = "0.3.21"
 tracing = "0.1"
 spin = "0.9.2"
 
