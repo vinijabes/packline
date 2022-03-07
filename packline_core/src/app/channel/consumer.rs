@@ -10,13 +10,11 @@ use futures::task::AtomicWaker;
 use futures::FutureExt;
 use tokio::time::{self, Duration};
 
-use crate::app::channel::Inner;
-
 use super::channel::ConsumerGroupHandler;
-use super::storage::ChannelStorage;
+use super::Channel;
 
 pub(crate) trait ConsumerStrategy: Send + Sync {
-    fn new(app: crate::app::App, channel: &mut Inner) -> Self
+    fn new(app: crate::app::App, channel: Channel) -> Self
     where
         Self: Sized;
 
@@ -25,27 +23,31 @@ pub(crate) trait ConsumerStrategy: Send + Sync {
 }
 
 pub struct BaseConsumerStrategy {
-    storage: Arc<dyn ChannelStorage>,
+    channel: Channel,
 }
 
 impl ConsumerStrategy for BaseConsumerStrategy {
-    fn new(_: crate::app::App, channel: &mut Inner) -> Self {
-        BaseConsumerStrategy {
-            storage: channel.storage.as_ref().unwrap().clone(),
-        }
+    fn new(_: crate::app::App, channel: Channel) -> Self {
+        BaseConsumerStrategy { channel }
     }
 
     fn produce(&self, data: &mut Vec<u32>) {
-        self.storage.enqueue(data);
+        if let Some(storage) = self.channel.storage() {
+            storage.enqueue(data);
+        }
     }
 
     fn consume(&self, offset: usize, count: usize) -> Option<Vec<u32>> {
-        let result = self.storage.peek(offset, count);
+        if let Some(storage) = self.channel.storage() {
+            let result = storage.peek(offset, count);
 
-        if result.is_empty() {
-            None
+            if result.is_empty() {
+                None
+            } else {
+                Some(result)
+            }
         } else {
-            Some(result)
+            None
         }
     }
 }
@@ -113,10 +115,9 @@ impl ConsumerWakerHandle {
 
 impl Drop for ConsumerWakerHandle {
     fn drop(&mut self) {
-        self.parent
-            .upgrade()
-            .unwrap()
-            .remove(self as *const ConsumerWakerHandle);
+        if let Some(parent) = self.parent.upgrade() {
+            parent.remove(self as *const ConsumerWakerHandle)
+        }
     }
 }
 
@@ -141,7 +142,7 @@ impl<'a> Consumer {
         }
     }
 
-    pub fn consume(&self) -> ConsumerFuture {
+    pub fn consume(&self) -> ConsumerFuture<time::Sleep> {
         ConsumerFuture::new(
             self.handler.waker().handle(),
             self.handler.clone(),
@@ -152,8 +153,10 @@ impl<'a> Consumer {
 
 type PinConsumerFuture = Pin<Box<dyn Future<Output = Option<Vec<u32>>>>>;
 
-pub struct ConsumerFuture {
-    timeout_future: Pin<Box<time::Sleep>>,
+use crate::internal::time::sleep::SleepTrait;
+
+pub struct ConsumerFuture<S: SleepTrait> {
+    timeout_future: Pin<Box<S>>,
     consumer_future: Option<PinConsumerFuture>,
     waker_handle: Arc<ConsumerWakerHandle>,
     handler: Arc<ConsumerGroupHandler>,
@@ -161,12 +164,33 @@ pub struct ConsumerFuture {
     buffer: Vec<u32>,
 }
 
-unsafe impl Send for ConsumerFuture {}
-unsafe impl Sync for ConsumerFuture {}
+unsafe impl<S: SleepTrait> Send for ConsumerFuture<S> {}
+unsafe impl<S: SleepTrait> Sync for ConsumerFuture<S> {}
 
-impl<'a> ConsumerFuture {
+impl<'a, S> ConsumerFuture<S>
+where
+    S: SleepTrait,
+{
     fn new(handle: Arc<ConsumerWakerHandle>, handler: Arc<ConsumerGroupHandler>, timeout: u64) -> Self {
-        let sleep = unsafe { Pin::new_unchecked(Box::new(time::sleep(Duration::from_millis(timeout)))) };
+        let sleep = unsafe { Pin::new_unchecked(Box::new(S::new(Duration::from_millis(timeout)))) };
+
+        ConsumerFuture {
+            timeout_future: sleep,
+            consumer_future: None,
+            waker_handle: handle,
+            handler,
+
+            buffer: Vec::new(),
+        }
+    }
+
+    #[cfg(test)]
+    fn new_with_timeout(
+        handle: Arc<ConsumerWakerHandle>,
+        handler: Arc<ConsumerGroupHandler>,
+        timeout_future: S,
+    ) -> Self {
+        let sleep = unsafe { Pin::new_unchecked(Box::new(timeout_future)) };
 
         ConsumerFuture {
             timeout_future: sleep,
@@ -179,7 +203,10 @@ impl<'a> ConsumerFuture {
     }
 }
 
-impl<'a> Future for ConsumerFuture {
+impl<'a, S> Future for ConsumerFuture<S>
+where
+    S: SleepTrait,
+{
     type Output = Vec<u32>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -221,5 +248,57 @@ impl<'a> Future for ConsumerFuture {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{task::Poll, time::Duration};
+
+    use futures::{task::noop_waker_ref, FutureExt};
+
+    use crate::{
+        app::{App, ChannelConfig},
+        internal::time::sleep::{MockSleep, SleepTrait},
+    };
+
+    use super::ConsumerFuture;
+
+    #[tokio::test]
+    async fn test_consumer_future_ready_only_on_available_data() {
+        let topic = "testing_topic".to_string();
+
+        let app = App::new();
+        let result = app
+            .create_channel(ChannelConfig {
+                name: topic.clone(),
+                partitions: 1,
+            })
+            .await;
+        assert!(result.is_ok());
+
+        let channel = app.get_channel(&(topic.clone(), 1)).await.unwrap();
+
+        let consumer_group_handler = channel.consumer_group_handler(0).await;
+        let consumer_waker_handler = consumer_group_handler.waker().handle();
+
+        let mock_sleep = MockSleep::new(Duration::from_millis(1000));
+        let mut future =
+            ConsumerFuture::new_with_timeout(consumer_waker_handler, consumer_group_handler, mock_sleep.clone());
+
+        let waker = noop_waker_ref();
+        let mut cx = std::task::Context::from_waker(waker);
+
+        let mut producer = channel.producer();
+
+        assert_eq!(future.poll_unpin(&mut cx), Poll::Pending);
+        producer.produce(&mut vec![0u32]).await;
+
+        assert_eq!(future.poll_unpin(&mut cx), Poll::Pending);
+        mock_sleep.force_complete();
+
+        producer.produce(&mut vec![1u32]).await;
+
+        assert_eq!(future.poll_unpin(&mut cx), Poll::Ready(vec![0u32, 1u32]));
     }
 }

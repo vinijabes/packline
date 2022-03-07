@@ -1,5 +1,4 @@
 pub use channel::Channel;
-pub(crate) use channel::Inner;
 
 #[allow(clippy::module_inception)]
 mod channel;
