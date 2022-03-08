@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
+use spin::RwLock as SpinRwLock;
 use tokio::sync::RwLock;
 
 use crate::app::channel::consumer::{BaseConsumerStrategy, Consumer, ConsumerWaker};
@@ -13,70 +14,47 @@ use crate::app::channel::producer::Producer;
 
 #[derive(Clone)]
 pub struct Channel {
-    inner: Arc<Inner>,
+    inner: Arc<SpinRwLock<Inner>>,
 }
 
-pub(crate) struct Inner {
+struct Inner {
     pub storage: Option<Arc<dyn ChannelStorage>>,
     pub consumer_strategy: Option<Arc<dyn ConsumerStrategy>>,
 
-    pub consumer_group_handlers: RwLock<HashMap<u128, Arc<ConsumerGroupHandler>>>,
+    pub consumer_group_handlers: Arc<RwLock<HashMap<u128, Arc<ConsumerGroupHandler>>>>,
 }
 
 impl Channel {
     pub fn new(app: crate::app::App) -> Self {
-        let inner = Inner::new(app);
+        let channel = Channel {
+            inner: Arc::new(SpinRwLock::new(Inner::new())),
+        };
+        let consumer_strategy = BaseConsumerStrategy::new(app.clone(), channel.clone());
+        let storage = VecStorage::new(app, channel.clone());
+        {
+            let mut inner = channel.inner.write();
 
-        Channel { inner: Arc::new(inner) }
+            inner.consumer_strategy = Some(Arc::new(consumer_strategy));
+            inner.storage = Some(Arc::new(storage));
+        }
+
+        channel
     }
 
     pub fn consumer(&self, consumer_id: u128) -> Consumer {
         Consumer::new(
             consumer_id,
-            futures::executor::block_on(self.inner.consumer_group_handler(consumer_id)),
+            futures::executor::block_on(self.consumer_group_handler(consumer_id)),
         )
     }
 
     pub fn producer(&self) -> Producer {
-        Producer::new(self.inner.clone())
-    }
-}
-
-impl Inner {
-    pub fn new(app: crate::app::App) -> Self {
-        let mut inner = Inner {
-            storage: None,
-            consumer_strategy: None,
-            consumer_group_handlers: RwLock::new(HashMap::new()),
-        };
-
-        let storage = Arc::new(VecStorage::new(app.clone(), &mut inner));
-        inner.storage = Some(storage);
-
-        let consumer_strategy = Arc::new(BaseConsumerStrategy::new(app, &mut inner));
-        inner.consumer_strategy = Some(consumer_strategy);
-
-        inner
+        Producer::new(self.clone())
     }
 
-    pub fn produce(&self, data: &mut Vec<u32>) {
-        self.consumer_strategy.as_ref().unwrap().produce(data);
-
-        let guard = futures::executor::block_on(self.consumer_group_handlers.read());
-        for (_, consumer_group_handler) in guard.iter() {
-            consumer_group_handler.waker.wake();
-        }
-    }
-
-    #[allow(dead_code)]
-    pub async fn consume(&self, offset: usize, count: usize) -> Option<Vec<u32>> {
-        let result = self.consumer_strategy.as_ref().unwrap().consume(offset, count);
-
-        result
-    }
-
-    async fn consumer_group_handler(&self, consumer_id: u128) -> Arc<ConsumerGroupHandler> {
-        let guard = self.consumer_group_handlers.read().await;
+    pub(crate) async fn consumer_group_handler(&self, consumer_id: u128) -> Arc<ConsumerGroupHandler> {
+        let inner = self.inner.read();
+        let guard = inner.consumer_group_handlers.read().await;
 
         if let Some(consumer_group_handler) = guard.get(&consumer_id) {
             return consumer_group_handler.clone();
@@ -84,16 +62,36 @@ impl Inner {
 
         drop(guard);
 
-        let handler = Arc::new(ConsumerGroupHandler {
-            offset: AtomicUsize::new(0),
-            consumer_strategy: self.consumer_strategy.as_ref().unwrap().clone(),
-            waker: Arc::new(ConsumerWaker::new()),
-        });
+        let handler = Arc::new(ConsumerGroupHandler::new(
+            inner.consumer_strategy.as_ref().unwrap().clone(),
+        ));
 
-        let mut guard = self.consumer_group_handlers.write().await;
+        let mut guard = inner.consumer_group_handlers.write().await;
 
         guard.insert(consumer_id, handler.clone());
         handler
+    }
+
+    pub(crate) fn storage(&self) -> Option<Arc<dyn ChannelStorage>> {
+        self.inner.read().storage.clone()
+    }
+
+    pub(crate) fn consumer_strategy(&self) -> Option<Arc<dyn ConsumerStrategy>> {
+        self.inner.read().consumer_strategy.clone()
+    }
+
+    pub(crate) fn consumer_group_handlers(&self) -> Arc<RwLock<HashMap<u128, Arc<ConsumerGroupHandler>>>> {
+        self.inner.read().consumer_group_handlers.clone()
+    }
+}
+
+impl Inner {
+    pub fn new() -> Self {
+        Inner {
+            storage: None,
+            consumer_strategy: None,
+            consumer_group_handlers: Arc::new(RwLock::new(HashMap::new())),
+        }
     }
 }
 
@@ -105,6 +103,14 @@ pub(crate) struct ConsumerGroupHandler {
 }
 
 impl ConsumerGroupHandler {
+    pub fn new(consumer_strategy: Arc<dyn ConsumerStrategy>) -> ConsumerGroupHandler {
+        ConsumerGroupHandler {
+            offset: AtomicUsize::new(0),
+            consumer_strategy,
+            waker: Arc::new(ConsumerWaker::new()),
+        }
+    }
+
     pub fn waker(&self) -> Arc<ConsumerWaker> {
         self.waker.clone()
     }
