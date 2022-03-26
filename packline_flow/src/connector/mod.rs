@@ -16,6 +16,7 @@ use packline_core::connector::{TCPConnectionHandler, TCPConnectorHandler};
 
 use crate::codec::FlowCodec;
 use crate::messages::consume::ConsumeV1;
+use crate::messages::produce::ProduceV1Response;
 use crate::messages::Message;
 use crate::messages::Packet;
 
@@ -67,7 +68,7 @@ impl TCPConnectionHandler for FlowConnectionHandler {
                 None => break,
                 Some(r) => {
                     let state = rc_state.clone();
-                    let packet = self.handle_packet(state.clone(), r.unwrap()).unwrap();
+                    let packet = self.handle_packet(state.clone(), r.unwrap()).await.unwrap();
                     if let Some(packet) = packet {
                         let mut sink = state.sink.lock().await;
                         let result = sink.send(packet).await;
@@ -84,15 +85,42 @@ impl TCPConnectionHandler for FlowConnectionHandler {
 }
 
 impl FlowConnectionHandler {
-    fn handle_packet(&self, state: Arc<ConnectionState>, packet: Packet) -> Result<Option<Packet>, std::io::Error> {
+    async fn handle_packet(
+        &self,
+        state: Arc<ConnectionState>,
+        packet: Packet,
+    ) -> Result<Option<Packet>, std::io::Error> {
         info!("handling packet {:?}", &packet.message);
         match &packet.message {
             Message::SubscribeTopicRequestV1(subscribe) => {
                 self.handle_subscribe_topic_request(state, packet.context_id, subscribe.clone());
                 Ok(None)
             }
+            Message::ProduceV1(produce) => Ok(Some(
+                self.handle_produce_request(state, packet.context_id, produce.clone())
+                    .await,
+            )),
             _ => Ok(Some(packet)),
         }
+    }
+
+    async fn handle_produce_request(
+        &self,
+        _: Arc<ConnectionState>,
+        context_id: u32,
+        mut produce: super::messages::produce::ProduceV1,
+    ) -> Packet {
+        let app = self.app.clone();
+
+        let topic = produce.topic.to_string();
+        let channel = app.get_channel(&(topic, 1u16)).await;
+
+        if let Some(channel) = channel {
+            let mut producer = channel.producer();
+            producer.produce(&mut produce.records).await;
+        }
+
+        Packet::new_with_context_id(context_id, (5, 1), Message::ProduceV1Response(ProduceV1Response {}))
     }
 
     fn handle_subscribe_topic_request(

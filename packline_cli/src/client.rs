@@ -1,3 +1,4 @@
+use packline_flow::messages::produce::ProduceV1;
 use tokio::net::{TcpStream, ToSocketAddrs};
 
 use packline_flow::messages::connect::ConnectRequestV1;
@@ -57,5 +58,12 @@ impl Client {
                 }
             }
         });
+    }
+
+    pub async fn produce(&mut self, topic: String, records: Vec<u32>) {
+        _ = self
+            .connection
+            .send((4, 1), Message::ProduceV1(ProduceV1 { topic, records }))
+            .await;
     }
 }
