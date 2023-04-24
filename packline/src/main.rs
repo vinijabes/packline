@@ -50,11 +50,13 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
             let mut interval = tokio::time::interval(Duration::from_millis(10));
 
             let mut rng = StdRng::from_entropy();
+
+            let mut client = connect("127.0.0.1:1883").await.unwrap();
             loop {
                 interval.tick().await;
 
                 let value: u32 = rng.gen_range(0u32..100u32);
-                producer.produce(&mut vec![value]).await;
+                client.produce("testing_topic".to_string(), vec![value]).await;
             }
         });
 

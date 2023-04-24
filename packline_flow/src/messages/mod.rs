@@ -5,6 +5,7 @@ use std::convert::Infallible;
 
 pub mod connect;
 pub mod consume;
+pub mod produce;
 pub mod subscribe;
 
 #[derive(Debug, Clone)]
@@ -12,6 +13,8 @@ pub enum Message {
     ConnectRequestV1(connect::ConnectRequestV1),
     SubscribeTopicRequestV1(subscribe::SubscribeTopicRequestV1),
     ConsumeV1(consume::ConsumeV1),
+    ProduceV1(produce::ProduceV1),
+    ProduceV1Response(produce::ProduceV1Response),
     Invalid,
 }
 
@@ -21,6 +24,8 @@ impl SizedSchema for Message {
             Message::ConnectRequestV1(m) => m.size(),
             Message::SubscribeTopicRequestV1(s) => s.size(),
             Message::ConsumeV1(c) => c.size(),
+            Message::ProduceV1(p) => p.size(),
+            Message::ProduceV1Response(p) => p.size(),
             _ => 0,
         }
     }
@@ -34,6 +39,8 @@ impl SerializableSchema for Message {
             Message::ConnectRequestV1(m) => m.serialize(encoder),
             Message::SubscribeTopicRequestV1(m) => m.serialize(encoder),
             Message::ConsumeV1(m) => m.serialize(encoder),
+            Message::ProduceV1(m) => m.serialize(encoder),
+            Message::ProduceV1Response(m) => m.serialize(encoder),
             _ => (),
         };
     }
@@ -93,6 +100,7 @@ impl Packet {
         }
     }
 
+    #[must_use]
     pub fn response(&self, route: RouteWithVersion, message: Message) -> Packet {
         Packet {
             packet_type: self.packet_type,
@@ -139,6 +147,8 @@ impl DeserializableSchema for Packet {
                 Message::SubscribeTopicRequestV1(subscribe::SubscribeTopicRequestV1::deserialize(decoder).unwrap())
             }
             (3, 1) => Message::ConsumeV1(consume::ConsumeV1::deserialize(decoder).unwrap()),
+            (4, 1) => Message::ProduceV1(produce::ProduceV1::deserialize(decoder).unwrap()),
+            (5, 1) => Message::ProduceV1Response(produce::ProduceV1Response::deserialize(decoder).unwrap()),
             _ => Message::Invalid,
         };
 
